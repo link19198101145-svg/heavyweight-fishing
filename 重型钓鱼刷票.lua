@@ -2,14 +2,15 @@ local workspace = game:GetService("Workspace")
 local replicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "AutoQuestGUI"
 screenGui.Parent = game:GetService("CoreGui")
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 280, 0, 240)
-mainFrame.Position = UDim2.new(0.5, -140, 0.4, -120)
+mainFrame.Size = UDim2.new(0, 280, 0, 270)
+mainFrame.Position = UDim2.new(0.5, -140, 0.4, -135)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
@@ -62,12 +63,9 @@ exitCorner.CornerRadius = UDim.new(0, 12)
 exitCorner.Parent = exitButton
 exitButton.Parent = mainFrame
 
-exitButton.MouseEnter:Connect(function()
-    exitButton.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-end)
-exitButton.MouseLeave:Connect(function()
-    exitButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
-end)
+exitButton.MouseEnter:Connect(function() exitButton.BackgroundColor3 = Color3.fromRGB(255, 80, 80) end)
+exitButton.MouseLeave:Connect(function() exitButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60) end)
+exitButton.MouseButton1Click:Connect(function() screenGui:Destroy() end)
 
 local closeButton = Instance.new("TextButton")
 closeButton.Size = UDim2.new(0, 24, 0, 24)
@@ -83,16 +81,55 @@ closeCorner.CornerRadius = UDim.new(0, 12)
 closeCorner.Parent = closeButton
 closeButton.Parent = mainFrame
 
-closeButton.MouseEnter:Connect(function()
-    closeButton.BackgroundColor3 = Color3.fromRGB(255, 70, 70)
-end)
-closeButton.MouseLeave:Connect(function()
-    closeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+closeButton.MouseEnter:Connect(function() closeButton.BackgroundColor3 = Color3.fromRGB(255, 70, 70) end)
+closeButton.MouseLeave:Connect(function() closeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50) end)
+
+local anchorFrame = Instance.new("Frame")
+anchorFrame.Size = UDim2.new(0, 260, 0, 30)
+anchorFrame.Position = UDim2.new(0, 10, 0, 42)
+anchorFrame.BackgroundTransparency = 1
+anchorFrame.Parent = mainFrame
+
+local anchorLabel = Instance.new("TextLabel")
+anchorLabel.Size = UDim2.new(0, 120, 1, 0)
+anchorLabel.BackgroundTransparency = 1
+anchorLabel.Text = "钓鱼条锚定"
+anchorLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+anchorLabel.TextSize = 13
+anchorLabel.Font = Enum.Font.Gotham
+anchorLabel.TextXAlignment = Enum.TextXAlignment.Left
+anchorLabel.Parent = anchorFrame
+
+local anchorBtn = Instance.new("TextButton")
+anchorBtn.Size = UDim2.new(0, 50, 0, 24)
+anchorBtn.Position = UDim2.new(1, -50, 0.5, -12)
+anchorBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+anchorBtn.Text = "关闭"
+anchorBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+anchorBtn.TextSize = 11
+anchorBtn.Font = Enum.Font.GothamBold
+anchorBtn.AutoButtonColor = false
+local anchorCorner = Instance.new("UICorner")
+anchorCorner.CornerRadius = UDim.new(0, 6)
+anchorCorner.Parent = anchorBtn
+anchorBtn.Parent = anchorFrame
+
+getgenv().Honey_Anchor = false
+
+anchorBtn.MouseButton1Click:Connect(function()
+    getgenv().Honey_Anchor = not getgenv().Honey_Anchor
+    if getgenv().Honey_Anchor then
+        anchorBtn.Text = "开启"
+        anchorBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+    else
+        anchorBtn.Text = "关闭"
+        anchorBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    end
 end)
 
 local modeLabel = Instance.new("TextLabel")
 modeLabel.Size = UDim2.new(1, -20, 0, 20)
-modeLabel.Position = UDim2.new(0, 10, 0, 42)
+modeLabel.Position = UDim2.new(0, 10, 0, 77)
 modeLabel.BackgroundTransparency = 1
 modeLabel.Text = "模式选择:"
 modeLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -103,7 +140,7 @@ modeLabel.Parent = mainFrame
 
 local modeContainer = Instance.new("Frame")
 modeContainer.Size = UDim2.new(0, 260, 0, 30)
-modeContainer.Position = UDim2.new(0, 10, 0, 63)
+modeContainer.Position = UDim2.new(0, 10, 0, 98)
 modeContainer.BackgroundTransparency = 1
 modeContainer.Parent = mainFrame
 
@@ -138,7 +175,7 @@ local currentMode = "accept"
 
 local historyLabel = Instance.new("TextLabel")
 historyLabel.Size = UDim2.new(1, -20, 0, 20)
-historyLabel.Position = UDim2.new(0, 10, 0, 95)
+historyLabel.Position = UDim2.new(0, 10, 0, 130)
 historyLabel.BackgroundTransparency = 1
 historyLabel.Text = "本次: 接0 交0 | 历史: 接0 交0"
 historyLabel.TextColor3 = Color3.fromRGB(150, 150, 155)
@@ -149,7 +186,7 @@ historyLabel.Parent = mainFrame
 
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(1, -20, 0, 25)
-statusLabel.Position = UDim2.new(0, 10, 0, 115)
+statusLabel.Position = UDim2.new(0, 10, 0, 150)
 statusLabel.BackgroundTransparency = 1
 statusLabel.Text = "状态: 已停止"
 statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
@@ -160,7 +197,7 @@ statusLabel.Parent = mainFrame
 
 local speedLabel = Instance.new("TextLabel")
 speedLabel.Size = UDim2.new(1, -20, 0, 25)
-speedLabel.Position = UDim2.new(0, 10, 0, 138)
+speedLabel.Position = UDim2.new(0, 10, 0, 173)
 speedLabel.BackgroundTransparency = 1
 speedLabel.Text = "速度: 0.50秒/次"
 speedLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -171,7 +208,7 @@ speedLabel.Parent = mainFrame
 
 local sliderBg = Instance.new("Frame")
 sliderBg.Size = UDim2.new(0, 210, 0, 6)
-sliderBg.Position = UDim2.new(0, 35, 0, 170)
+sliderBg.Position = UDim2.new(0, 35, 0, 205)
 sliderBg.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 sliderBg.BorderSizePixel = 0
 local sliderBgCorner = Instance.new("UICorner")
@@ -214,23 +251,19 @@ local function updateSpeedDisplay(v)
 end
 
 local sliderDragging = false
-
 sliderButton.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         sliderDragging = true
     end
 end)
-
 UserInputService.InputChanged:Connect(function(input)
     if sliderDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        local x = UserInputService:GetMouseLocation().X
-        local t = math.clamp((x - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X, 0, 1)
+        local t = math.clamp((UserInputService:GetMouseLocation().X - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X, 0, 1)
         sliderFill.Size = UDim2.new(t, 0, 1, 0)
         sliderButton.Position = UDim2.new(t, -8, 0.5, -8)
         updateSpeedDisplay(sliderToSpeed(t))
     end
 end)
-
 UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         sliderDragging = false
@@ -239,7 +272,7 @@ end)
 
 local actionBtn = Instance.new("TextButton")
 actionBtn.Size = UDim2.new(0, 230, 0, 35)
-actionBtn.Position = UDim2.new(0, 25, 0, 187)
+actionBtn.Position = UDim2.new(0, 25, 0, 222)
 actionBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
 actionBtn.Text = "开始"
 actionBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -251,12 +284,9 @@ actionCorner.Parent = actionBtn
 actionBtn.Parent = mainFrame
 
 local running = false
-local taskCount = 0
-local lastTaskTime = 0
-local sessionAccept = 0
-local sessionSubmit = 0
-local totalAccept = 0
-local totalSubmit = 0
+local taskCount, lastTaskTime = 0, 0
+local sessionAccept, sessionSubmit = 0, 0
+local totalAccept, totalSubmit = 0, 0
 
 local function updateHistory()
     historyLabel.Text = string.format("本次: 接%d 交%d | 历史: 接%d 交%d", sessionAccept, sessionSubmit, totalAccept, totalSubmit)
@@ -299,59 +329,44 @@ miniExit.MouseButton1Click:Connect(function() screenGui:Destroy() end)
 miniFrame.MouseEnter:Connect(function() miniFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50) end)
 miniFrame.MouseLeave:Connect(function() miniFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35) end)
 
-local miniDragging = false
-local miniDragStart = nil
-local miniStartPos = nil
-
+local miniDragging, miniDragStart, miniStartPos = false, nil, nil
 miniFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        miniDragging = true
-        miniDragStart = input.Position
-        miniStartPos = miniFrame.Position
+        miniDragging, miniDragStart, miniStartPos = true, input.Position, miniFrame.Position
     end
 end)
-
 UserInputService.InputChanged:Connect(function(input)
     if miniDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
         local d = input.Position - miniDragStart
         miniFrame.Position = UDim2.new(miniStartPos.X.Scale, miniStartPos.X.Offset + d.X, miniStartPos.Y.Scale, miniStartPos.Y.Offset + d.Y)
     end
 end)
-
 miniFrame.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         if miniDragging and (input.Position - miniDragStart).Magnitude < 5 then
-            miniFrame.Visible = false
-            mainFrame.Visible = true
+            miniFrame.Visible, mainFrame.Visible = false, true
         end
         miniDragging = false
     end
 end)
 
-exitButton.MouseButton1Click:Connect(function() screenGui:Destroy() end)
-closeButton.MouseButton1Click:Connect(function()
-    mainFrame.Visible = false
-    miniFrame.Visible = true
-end)
+closeButton.MouseButton1Click:Connect(function() mainFrame.Visible, miniFrame.Visible = false, true end)
 
 local function setMode(m)
     currentMode = m
     acceptModeBtn.BackgroundColor3 = m == "accept" and Color3.fromRGB(50, 180, 50) or Color3.fromRGB(60, 60, 60)
     submitModeBtn.BackgroundColor3 = m == "submit" and Color3.fromRGB(200, 150, 50) or Color3.fromRGB(60, 60, 60)
 end
-
 acceptModeBtn.MouseButton1Click:Connect(function() setMode("accept") end)
 submitModeBtn.MouseButton1Click:Connect(function() setMode("submit") end)
 
 local npcCache, eventCache = nil, nil
-
 local function getNPC()
     if not npcCache or not npcCache.Parent then
         pcall(function() npcCache = workspace:WaitForChild("NPC", 5):WaitForChild("Function", 5):WaitForChild("Ticket Quest Giver", 5) end)
     end
     return npcCache
 end
-
 local function getEvent()
     if not eventCache or not eventCache.Parent then
         pcall(function() eventCache = replicatedStorage:WaitForChild("Events", 5):WaitForChild("ChooseDialogueOption", 5) end)
@@ -361,35 +376,29 @@ end
 
 local function acceptQuest()
     local n, e = getNPC(), getEvent()
-    if not n or not e then return false end
-    return pcall(function() e:FireServer("Ticket Quest Giver", 2, "HardAcceptQuest", {n, "Ticket Quest"}) end)
+    return n and e and pcall(function() e:FireServer("Ticket Quest Giver", 2, "HardAcceptQuest", {n, "Ticket Quest"}) end)
 end
-
 local function submitQuest()
     local n, e = getNPC(), getEvent()
-    if not n or not e then return false end
-    return pcall(function() e:FireServer("Ticket Quest Giver", 1, "Quest", {n}) end)
+    return n and e and pcall(function() e:FireServer("Ticket Quest Giver", 1, "Quest", {n}) end)
 end
 
 local function doTask()
     if not getNPC() or not getEvent() then
-        statusLabel.Text = "状态: 等待对象..."
-        statusLabel.TextColor3 = Color3.fromRGB(255, 200, 50)
+        statusLabel.Text, statusLabel.TextColor3 = "状态: 等待对象...", Color3.fromRGB(255, 200, 50)
         task.wait(1)
         return
     end
     local ok = currentMode == "accept" and acceptQuest() or submitQuest()
     if ok then
         taskCount = taskCount + 1
-        if currentMode == "accept" then sessionAccept = sessionAccept + 1; totalAccept = totalAccept + 1
-        else sessionSubmit = sessionSubmit + 1; totalSubmit = totalSubmit + 1 end
+        if currentMode == "accept" then sessionAccept, totalAccept = sessionAccept + 1, totalAccept + 1
+        else sessionSubmit, totalSubmit = sessionSubmit + 1, totalSubmit + 1 end
         updateHistory()
         statusLabel.Text = currentMode == "accept" and string.format("状态: 接任务中 (已接%d次)", taskCount) or string.format("状态: 交任务中 (已交%d次)", taskCount)
-        statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
-        lastTaskTime = tick()
+        statusLabel.TextColor3, lastTaskTime = Color3.fromRGB(100, 255, 100), tick()
     else
-        statusLabel.Text = "状态: 发送失败，重试中..."
-        statusLabel.TextColor3 = Color3.fromRGB(255, 200, 50)
+        statusLabel.Text, statusLabel.TextColor3 = "状态: 发送失败，重试中...", Color3.fromRGB(255, 200, 50)
         task.wait(1)
     end
 end
@@ -397,36 +406,49 @@ end
 actionBtn.MouseButton1Click:Connect(function()
     if running then
         running = false
-        actionBtn.Text = "开始"
-        actionBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+        actionBtn.Text, actionBtn.BackgroundColor3 = "开始", Color3.fromRGB(50, 200, 50)
         statusLabel.Text = string.format("状态: 已停止 (共%d%s)", taskCount, currentMode == "accept" and "接" or "交")
         statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
     else
         running = true
         taskCount, sessionAccept, sessionSubmit = 0, 0, 0
         updateHistory()
-        actionBtn.Text = "停止"
-        actionBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        statusLabel.Text = "状态: 运行中..."
-        statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+        actionBtn.Text, actionBtn.BackgroundColor3 = "停止", Color3.fromRGB(200, 50, 50)
+        statusLabel.Text, statusLabel.TextColor3 = "状态: 运行中...", Color3.fromRGB(100, 255, 100)
         task.spawn(function()
             while running do
                 doTask()
-                local waitTime = currentSpeed
-                if lastTaskTime > 0 then
-                    local elapsed = tick() - lastTaskTime
-                    waitTime = elapsed < currentSpeed and currentSpeed - elapsed or 0.01
-                end
-                task.wait(math.max(0.01, waitTime))
+                local w = currentSpeed
+                if lastTaskTime > 0 then w = math.max(0.01, tick() - lastTaskTime < currentSpeed and currentSpeed - (tick() - lastTaskTime) or 0.01) end
+                task.wait(w)
             end
         end)
     end
 end)
 
 local hue = 0
+local LocalPlayer = Players.LocalPlayer
 RunService.RenderStepped:Connect(function(dt)
     hue = (hue + dt * 0.3) % 1
     local c = HSVtoRGB(hue, 0.8, 1)
     title.TextColor3 = c
-    miniFrame.TextColor3 = c
+    if miniFrame.Visible then miniFrame.TextColor3 = c end
+    if getgenv().Honey_Anchor then
+        pcall(function()
+            local mg = LocalPlayer.PlayerGui:FindFirstChild("MainGui")
+            if mg then
+                local fg = mg:FindFirstChild("Fishing")
+                if fg and fg.Visible then
+                    local bf = fg:FindFirstChild("BarFrame")
+                    if bf then
+                        local bar = bf:FindFirstChild("Bar")
+                        if bar then
+                            bar.Position = UDim2.new(0.5, 0, bar.Position.Y.Scale, 0)
+                            replicatedStorage.Fishing:FireServer("1")
+                        end
+                    end
+                end
+            end
+        end)
+    end
 end)
