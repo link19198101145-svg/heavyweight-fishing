@@ -3,14 +3,15 @@ local replicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "AutoQuestGUI"
 screenGui.Parent = game:GetService("CoreGui")
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 280, 0, 300)
-mainFrame.Position = UDim2.new(0.5, -140, 0.4, -150)
+mainFrame.Size = UDim2.new(0, 340, 0, 300)
+mainFrame.Position = UDim2.new(0.5, -170, 0.4, -150)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
@@ -44,7 +45,7 @@ local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, -60, 0, 30)
 title.Position = UDim2.new(0, 30, 0, 10)
 title.BackgroundTransparency = 1
-title.Text = "自动刷票任务"
+title.Text = "钓鱼功能🎣"
 title.TextSize = 18
 title.Font = Enum.Font.GothamBold
 title.Parent = mainFrame
@@ -79,11 +80,53 @@ closeCorner.CornerRadius = UDim.new(0, 12)
 closeCorner.Parent = closeButton
 closeButton.Parent = mainFrame
 
+local navBar = Instance.new("Frame")
+navBar.Size = UDim2.new(0, 60, 1, -40)
+navBar.Position = UDim2.new(0, 0, 0, 40)
+navBar.BackgroundColor3 = Color3.fromRGB(28, 28, 30)
+navBar.BorderSizePixel = 0
+navBar.Parent = mainFrame
+
+local fishingNavBtn = Instance.new("TextButton")
+fishingNavBtn.Size = UDim2.new(0, 50, 0, 50)
+fishingNavBtn.Position = UDim2.new(0, 5, 0, 10)
+fishingNavBtn.BackgroundColor3 = Color3.fromRGB(0, 122, 255)
+fishingNavBtn.Text = "钓鱼"
+fishingNavBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+fishingNavBtn.TextSize = 11
+fishingNavBtn.Font = Enum.Font.GothamBold
+fishingNavBtn.AutoButtonColor = false
+local fishingNavCorner = Instance.new("UICorner")
+fishingNavCorner.CornerRadius = UDim.new(0, 8)
+fishingNavCorner.Parent = fishingNavBtn
+fishingNavBtn.Parent = navBar
+
+local ticketNavBtn = Instance.new("TextButton")
+ticketNavBtn.Size = UDim2.new(0, 50, 0, 50)
+ticketNavBtn.Position = UDim2.new(0, 5, 0, 70)
+ticketNavBtn.BackgroundColor3 = Color3.fromRGB(58, 58, 60)
+ticketNavBtn.Text = "刷票"
+ticketNavBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ticketNavBtn.TextSize = 11
+ticketNavBtn.Font = Enum.Font.GothamBold
+ticketNavBtn.AutoButtonColor = false
+local ticketNavCorner = Instance.new("UICorner")
+ticketNavCorner.CornerRadius = UDim.new(0, 8)
+ticketNavCorner.Parent = ticketNavBtn
+ticketNavBtn.Parent = navBar
+
+local fishingPage = Instance.new("Frame")
+fishingPage.Size = UDim2.new(1, -60, 1, -40)
+fishingPage.Position = UDim2.new(0, 60, 0, 40)
+fishingPage.BackgroundTransparency = 1
+fishingPage.Visible = true
+fishingPage.Parent = mainFrame
+
 local anchorFrame = Instance.new("Frame")
 anchorFrame.Size = UDim2.new(0, 260, 0, 30)
-anchorFrame.Position = UDim2.new(0, 10, 0, 42)
+anchorFrame.Position = UDim2.new(0, 10, 0, 10)
 anchorFrame.BackgroundTransparency = 1
-anchorFrame.Parent = mainFrame
+anchorFrame.Parent = fishingPage
 
 local anchorLabel = Instance.new("TextLabel")
 anchorLabel.Size = UDim2.new(0, 120, 1, 0)
@@ -117,16 +160,171 @@ anchorBtn.MouseButton1Click:Connect(function()
     anchorBtn.BackgroundColor3 = getgenv().Honey_Anchor and Color3.fromRGB(50, 180, 50) or Color3.fromRGB(60, 60, 60)
 end)
 
+local autoCastFrame = Instance.new("Frame")
+autoCastFrame.Size = UDim2.new(0, 260, 0, 30)
+autoCastFrame.Position = UDim2.new(0, 10, 0, 50)
+autoCastFrame.BackgroundTransparency = 1
+autoCastFrame.Parent = fishingPage
+
+local autoCastLabel = Instance.new("TextLabel")
+autoCastLabel.Size = UDim2.new(0, 120, 1, 0)
+autoCastLabel.BackgroundTransparency = 1
+autoCastLabel.Text = "自动抛竿"
+autoCastLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+autoCastLabel.TextSize = 13
+autoCastLabel.Font = Enum.Font.Gotham
+autoCastLabel.TextXAlignment = Enum.TextXAlignment.Left
+autoCastLabel.Parent = autoCastFrame
+
+local autoCastBtn = Instance.new("TextButton")
+autoCastBtn.Size = UDim2.new(0, 50, 0, 24)
+autoCastBtn.Position = UDim2.new(1, -50, 0.5, -12)
+autoCastBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+autoCastBtn.Text = "关闭"
+autoCastBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+autoCastBtn.TextSize = 11
+autoCastBtn.Font = Enum.Font.GothamBold
+autoCastBtn.AutoButtonColor = false
+local autoCastCorner = Instance.new("UICorner")
+autoCastCorner.CornerRadius = UDim.new(0, 6)
+autoCastCorner.Parent = autoCastBtn
+autoCastBtn.Parent = autoCastFrame
+
+getgenv().Honey_AutoCast = false
+
+autoCastBtn.MouseButton1Click:Connect(function()
+    getgenv().Honey_AutoCast = not getgenv().Honey_AutoCast
+    autoCastBtn.Text = getgenv().Honey_AutoCast and "开启" or "关闭"
+    autoCastBtn.BackgroundColor3 = getgenv().Honey_AutoCast and Color3.fromRGB(50, 180, 50) or Color3.fromRGB(60, 60, 60)
+end)
+
+getgenv().Honey_AutoSkill = false
+getgenv().Honey_Skills = {Z = true, X = true, C = true, V = true}
+
+local skillToggleFrame = Instance.new("Frame")
+skillToggleFrame.Size = UDim2.new(0, 260, 0, 30)
+skillToggleFrame.Position = UDim2.new(0, 10, 0, 90)
+skillToggleFrame.BackgroundTransparency = 1
+skillToggleFrame.Parent = fishingPage
+
+local skillToggleLabel = Instance.new("TextLabel")
+skillToggleLabel.Size = UDim2.new(0, 120, 1, 0)
+skillToggleLabel.BackgroundTransparency = 1
+skillToggleLabel.Text = "自动技能(开启后无法手动抛竿)"
+skillToggleLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+skillToggleLabel.TextSize = 13
+skillToggleLabel.Font = Enum.Font.Gotham
+skillToggleLabel.TextXAlignment = Enum.TextXAlignment.Left
+skillToggleLabel.Parent = skillToggleFrame
+
+local skillToggleBtn = Instance.new("TextButton")
+skillToggleBtn.Size = UDim2.new(0, 50, 0, 24)
+skillToggleBtn.Position = UDim2.new(1, -50, 0.5, -12)
+skillToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+skillToggleBtn.Text = "关闭"
+skillToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+skillToggleBtn.TextSize = 11
+skillToggleBtn.Font = Enum.Font.GothamBold
+skillToggleBtn.AutoButtonColor = false
+local skillToggleCorner = Instance.new("UICorner")
+skillToggleCorner.CornerRadius = UDim.new(0, 6)
+skillToggleCorner.Parent = skillToggleBtn
+skillToggleBtn.Parent = skillToggleFrame
+
+skillToggleBtn.MouseButton1Click:Connect(function()
+    getgenv().Honey_AutoSkill = not getgenv().Honey_AutoSkill
+    skillToggleBtn.Text = getgenv().Honey_AutoSkill and "开启" or "关闭"
+    skillToggleBtn.BackgroundColor3 = getgenv().Honey_AutoSkill and Color3.fromRGB(50, 180, 50) or Color3.fromRGB(60, 60, 60)
+end)
+
+local skillKeys = {"Z", "X", "C", "V"}
+local skillBtns = {}
+
+local skillsRow = Instance.new("Frame")
+skillsRow.Size = UDim2.new(0, 260, 0, 30)
+skillsRow.Position = UDim2.new(0, 10, 0, 130)
+skillsRow.BackgroundTransparency = 1
+skillsRow.Parent = fishingPage
+
+for i, key in ipairs(skillKeys) do
+    local skillBtn = Instance.new("TextButton")
+    skillBtn.Size = UDim2.new(0, 56, 0, 28)
+    skillBtn.Position = UDim2.new(0, (i-1)*68, 0, 0)
+    skillBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+    skillBtn.Text = key
+    skillBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    skillBtn.TextSize = 14
+    skillBtn.Font = Enum.Font.GothamBold
+    skillBtn.AutoButtonColor = false
+    local skillCorner = Instance.new("UICorner")
+    skillCorner.CornerRadius = UDim.new(0, 6)
+    skillCorner.Parent = skillBtn
+    skillBtn.Parent = skillsRow
+
+    skillBtn.MouseButton1Click:Connect(function()
+        getgenv().Honey_Skills[key] = not getgenv().Honey_Skills[key]
+        skillBtn.BackgroundColor3 = getgenv().Honey_Skills[key] and Color3.fromRGB(50, 180, 50) or Color3.fromRGB(60, 60, 60)
+    end)
+
+    skillBtns[key] = skillBtn
+end
+
+getgenv().Honey_AutoSell = false
+getgenv().Honey_SellDelay = 5
+
+local autoSellFrame = Instance.new("Frame")
+autoSellFrame.Size = UDim2.new(0, 260, 0, 30)
+autoSellFrame.Position = UDim2.new(0, 10, 0, 170)
+autoSellFrame.BackgroundTransparency = 1
+autoSellFrame.Parent = fishingPage
+
+local autoSellLabel = Instance.new("TextLabel")
+autoSellLabel.Size = UDim2.new(0, 120, 1, 0)
+autoSellLabel.BackgroundTransparency = 1
+autoSellLabel.Text = "自动售卖(可能不完善)"
+autoSellLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+autoSellLabel.TextSize = 13
+autoSellLabel.Font = Enum.Font.Gotham
+autoSellLabel.TextXAlignment = Enum.TextXAlignment.Left
+autoSellLabel.Parent = autoSellFrame
+
+local autoSellBtn = Instance.new("TextButton")
+autoSellBtn.Size = UDim2.new(0, 50, 0, 24)
+autoSellBtn.Position = UDim2.new(1, -50, 0.5, -12)
+autoSellBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+autoSellBtn.Text = "关闭"
+autoSellBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+autoSellBtn.TextSize = 11
+autoSellBtn.Font = Enum.Font.GothamBold
+autoSellBtn.AutoButtonColor = false
+local autoSellCorner = Instance.new("UICorner")
+autoSellCorner.CornerRadius = UDim.new(0, 6)
+autoSellCorner.Parent = autoSellBtn
+autoSellBtn.Parent = autoSellFrame
+
+autoSellBtn.MouseButton1Click:Connect(function()
+    getgenv().Honey_AutoSell = not getgenv().Honey_AutoSell
+    autoSellBtn.Text = getgenv().Honey_AutoSell and "开启" or "关闭"
+    autoSellBtn.BackgroundColor3 = getgenv().Honey_AutoSell and Color3.fromRGB(50, 180, 50) or Color3.fromRGB(60, 60, 60)
+end)
+
+local ticketPage = Instance.new("Frame")
+ticketPage.Size = UDim2.new(1, -60, 1, -40)
+ticketPage.Position = UDim2.new(0, 60, 0, 40)
+ticketPage.BackgroundTransparency = 1
+ticketPage.Visible = false
+ticketPage.Parent = mainFrame
+
 local editorRow = Instance.new("Frame")
 editorRow.Size = UDim2.new(0, 260, 0, 30)
-editorRow.Position = UDim2.new(0, 10, 0, 77)
+editorRow.Position = UDim2.new(0, 10, 0, 10)
 editorRow.BackgroundTransparency = 1
-editorRow.Parent = mainFrame
+editorRow.Parent = ticketPage
 
 local editorLabel = Instance.new("TextLabel")
 editorLabel.Size = UDim2.new(0, 120, 1, 0)
 editorLabel.BackgroundTransparency = 1
-editorLabel.Text = "数值修改器(客户端，防止刷太多发视频被封)"
+editorLabel.Text = "数值修改器(客户端,防止刷太多录视频被封)"
 editorLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 editorLabel.TextSize = 13
 editorLabel.Font = Enum.Font.Gotham
@@ -212,7 +410,7 @@ local crystalLabel = Instance.new("TextLabel")
 crystalLabel.Size = UDim2.new(0, 50, 0, 20)
 crystalLabel.Position = UDim2.new(0, 15, 0, 68)
 crystalLabel.BackgroundTransparency = 1
-crystalLabel.Text = "水晶:"
+crystalLabel.Text = "水晶数:"
 crystalLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 crystalLabel.TextSize = 12
 crystalLabel.Font = Enum.Font.Gotham
@@ -265,20 +463,20 @@ end)
 
 local modeLabel = Instance.new("TextLabel")
 modeLabel.Size = UDim2.new(1, -20, 0, 20)
-modeLabel.Position = UDim2.new(0, 10, 0, 112)
+modeLabel.Position = UDim2.new(0, 10, 0, 50)
 modeLabel.BackgroundTransparency = 1
 modeLabel.Text = "模式选择:"
 modeLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 modeLabel.TextSize = 13
 modeLabel.Font = Enum.Font.Gotham
 modeLabel.TextXAlignment = Enum.TextXAlignment.Left
-modeLabel.Parent = mainFrame
+modeLabel.Parent = ticketPage
 
 local modeContainer = Instance.new("Frame")
 modeContainer.Size = UDim2.new(0, 260, 0, 30)
-modeContainer.Position = UDim2.new(0, 10, 0, 133)
+modeContainer.Position = UDim2.new(0, 10, 0, 71)
 modeContainer.BackgroundTransparency = 1
-modeContainer.Parent = mainFrame
+modeContainer.Parent = ticketPage
 
 local acceptModeBtn = Instance.new("TextButton")
 acceptModeBtn.Size = UDim2.new(0, 125, 0, 28)
@@ -311,46 +509,46 @@ local currentMode = "accept"
 
 local historyLabel = Instance.new("TextLabel")
 historyLabel.Size = UDim2.new(1, -20, 0, 20)
-historyLabel.Position = UDim2.new(0, 10, 0, 165)
+historyLabel.Position = UDim2.new(0, 10, 0, 105)
 historyLabel.BackgroundTransparency = 1
 historyLabel.Text = "本次: 接0 交0 | 历史: 接0 交0"
 historyLabel.TextColor3 = Color3.fromRGB(150, 150, 155)
 historyLabel.TextSize = 11
 historyLabel.Font = Enum.Font.GothamMedium
 historyLabel.TextXAlignment = Enum.TextXAlignment.Left
-historyLabel.Parent = mainFrame
+historyLabel.Parent = ticketPage
 
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(1, -20, 0, 25)
-statusLabel.Position = UDim2.new(0, 10, 0, 185)
+statusLabel.Position = UDim2.new(0, 10, 0, 125)
 statusLabel.BackgroundTransparency = 1
 statusLabel.Text = "状态: 已停止"
 statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
 statusLabel.TextSize = 14
 statusLabel.Font = Enum.Font.Gotham
 statusLabel.TextXAlignment = Enum.TextXAlignment.Left
-statusLabel.Parent = mainFrame
+statusLabel.Parent = ticketPage
 
 local speedLabel = Instance.new("TextLabel")
 speedLabel.Size = UDim2.new(1, -20, 0, 25)
-speedLabel.Position = UDim2.new(0, 10, 0, 208)
+speedLabel.Position = UDim2.new(0, 10, 0, 148)
 speedLabel.BackgroundTransparency = 1
 speedLabel.Text = "速度: 0.50秒/次"
 speedLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 speedLabel.TextSize = 14
 speedLabel.Font = Enum.Font.Gotham
 speedLabel.TextXAlignment = Enum.TextXAlignment.Left
-speedLabel.Parent = mainFrame
+speedLabel.Parent = ticketPage
 
 local sliderBg = Instance.new("Frame")
 sliderBg.Size = UDim2.new(0, 210, 0, 6)
-sliderBg.Position = UDim2.new(0, 35, 0, 240)
+sliderBg.Position = UDim2.new(0, 35, 0, 180)
 sliderBg.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 sliderBg.BorderSizePixel = 0
 local sliderBgCorner = Instance.new("UICorner")
 sliderBgCorner.CornerRadius = UDim.new(0, 3)
 sliderBgCorner.Parent = sliderBg
-sliderBg.Parent = mainFrame
+sliderBg.Parent = ticketPage
 
 local sliderFill = Instance.new("Frame")
 sliderFill.Size = UDim2.new(0.5, 0, 1, 0)
@@ -411,7 +609,7 @@ end)
 
 local actionBtn = Instance.new("TextButton")
 actionBtn.Size = UDim2.new(0, 230, 0, 35)
-actionBtn.Position = UDim2.new(0, 25, 0, 255)
+actionBtn.Position = UDim2.new(0, 25, 0, 195)
 actionBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
 actionBtn.Text = "开始"
 actionBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -420,7 +618,7 @@ actionBtn.Font = Enum.Font.GothamBold
 local actionCorner = Instance.new("UICorner")
 actionCorner.CornerRadius = UDim.new(0, 6)
 actionCorner.Parent = actionBtn
-actionBtn.Parent = mainFrame
+actionBtn.Parent = ticketPage
 
 local running = false
 local taskCount, lastTaskTime = 0, 0
@@ -435,7 +633,7 @@ local miniFrame = Instance.new("TextButton")
 miniFrame.Size = UDim2.new(0, 180, 0, 45)
 miniFrame.Position = UDim2.new(0.5, -90, 0.5, -22)
 miniFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-miniFrame.Text = "打开刷票脚本UI"
+miniFrame.Text = "打开UI--Made by 茶茶"
 miniFrame.TextSize = 16
 miniFrame.Font = Enum.Font.GothamBold
 miniFrame.BorderSizePixel = 0
@@ -491,6 +689,17 @@ miniFrame.InputEnded:Connect(function(input)
         miniDragging = false
     end
 end)
+
+local function switchPage(page)
+    fishingPage.Visible = page == "fishing"
+    ticketPage.Visible = page == "ticket"
+    fishingNavBtn.BackgroundColor3 = page == "fishing" and Color3.fromRGB(0, 122, 255) or Color3.fromRGB(58, 58, 60)
+    ticketNavBtn.BackgroundColor3 = page == "ticket" and Color3.fromRGB(0, 122, 255) or Color3.fromRGB(58, 58, 60)
+    title.Text = page == "fishing" and "钓鱼功能🎣" or "刷票功能😱"
+end
+
+fishingNavBtn.MouseButton1Click:Connect(function() switchPage("fishing") end)
+ticketNavBtn.MouseButton1Click:Connect(function() switchPage("ticket") end)
 
 local function setMode(m)
     currentMode = m
@@ -567,6 +776,54 @@ actionBtn.MouseButton1Click:Connect(function()
                 task.wait(w)
             end
         end)
+    end
+end)
+
+task.spawn(function()
+    while task.wait(1) do
+        if getgenv().Honey_AutoCast then
+            pcall(function()
+                local Character = Players.LocalPlayer.Character
+                local MainGui = Players.LocalPlayer.PlayerGui:FindFirstChild("MainGui")
+                if MainGui then
+                    local FishingGui = MainGui:FindFirstChild("Fishing")
+                    if Character and not Character:GetAttribute("Fishing") and FishingGui and not FishingGui.Visible then
+                        replicatedStorage.Events.Fishing:FireServer()
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+task.spawn(function()
+    local KeyMap = {
+        Z = Enum.KeyCode.Z,
+        X = Enum.KeyCode.X,
+        C = Enum.KeyCode.C,
+        V = Enum.KeyCode.V
+    }
+    while task.wait(0.5) do
+        if getgenv().Honey_AutoSkill then
+            for KeyName, KeyCode in pairs(KeyMap) do
+                if getgenv().Honey_Skills[KeyName] then
+                    VirtualInputManager:SendKeyEvent(true, KeyCode, false, game)
+                    task.wait(0.1)
+                    VirtualInputManager:SendKeyEvent(false, KeyCode, false, game)
+                end
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(getgenv().Honey_SellDelay)
+        if getgenv().Honey_AutoSell then
+            pcall(function()
+                replicatedStorage.Events.SellFish:FireServer("All")
+            end)
+        end
     end
 end)
 
