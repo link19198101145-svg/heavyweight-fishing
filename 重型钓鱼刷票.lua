@@ -6,6 +6,19 @@ local Players = game:GetService("Players")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local TeleportService = game:GetService("TeleportService")
 
+task.spawn(function()
+    local Event = replicatedStorage.Events.NotifyRobloxChat
+    local color = Color3.new(1, 0.60784316062927, 0.32549020648003)
+    task.wait(1)
+    pcall(function() firesignal(Event.OnClientEvent, "欢迎使用", color) end)
+    task.wait(0.5)
+    pcall(function() firesignal(Event.OnClientEvent, "脚本作者为茶茶", color) end)
+    task.wait(0.5)
+    pcall(function() firesignal(Event.OnClientEvent, "本脚本为免费脚本,如果你是买的证明被圈了", color) end)
+    task.wait(0.5)
+    pcall(function() firesignal(Event.OnClientEvent, "温馨提示:聊天栏中以上内容别人看不到", color) end)
+end)
+
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "AutoQuestGUI"
 screenGui.Parent = game:GetService("CoreGui")
@@ -400,7 +413,7 @@ baitShopRow.Parent = ticketContent
 local baitShopLabel = Instance.new("TextLabel")
 baitShopLabel.Size = UDim2.new(0, 120, 1, 0)
 baitShopLabel.BackgroundTransparency = 1
-baitShopLabel.Text = "饵料商城(用100个诱饵)"
+baitShopLabel.Text = "打开饵料商城(用100个诱饵)"
 baitShopLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 baitShopLabel.TextSize = 13
 baitShopLabel.Font = Enum.Font.Gotham
@@ -805,7 +818,7 @@ traitOpenRow.Parent = traitPage
 local traitLabel = Instance.new("TextLabel")
 traitLabel.Size = UDim2.new(0, 120, 1, 0)
 traitLabel.BackgroundTransparency = 1
-traitLabel.Text = "特制抽取"
+traitLabel.Text = "打开特制抽取界面"
 traitLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 traitLabel.TextSize = 13
 traitLabel.Font = Enum.Font.Gotham
@@ -843,7 +856,7 @@ traitExchangeRow.Parent = traitPage
 local traitExchangeLabel = Instance.new("TextLabel")
 traitExchangeLabel.Size = UDim2.new(0, 120, 1, 0)
 traitExchangeLabel.BackgroundTransparency = 1
-traitExchangeLabel.Text = "特质石交换(或许我以后会写一次交换指定数量)"
+traitExchangeLabel.Text = "打开特制石兑换(交换1个或10个)"
 traitExchangeLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 traitExchangeLabel.TextSize = 13
 traitExchangeLabel.Font = Enum.Font.Gotham
@@ -869,6 +882,48 @@ traitExchangeBtn.MouseButton1Click:Connect(function()
         replicatedStorage:WaitForChild("Events"):WaitForChild("ChooseDialogueOption"):FireServer("Nanjiang", 2, "OpenTraitExchange", {
             workspace:WaitForChild("NPC"):WaitForChild("Function"):WaitForChild("Nanjiang")
         })
+    end)
+end)
+
+local traitBulkRow = Instance.new("Frame")
+traitBulkRow.Size = UDim2.new(0, 260, 0, 30)
+traitBulkRow.Position = UDim2.new(0, 10, 0, 90)
+traitBulkRow.BackgroundTransparency = 1
+traitBulkRow.Parent = traitPage
+
+local traitBulkLabel = Instance.new("TextLabel")
+traitBulkLabel.Size = UDim2.new(0, 120, 1, 0)
+traitBulkLabel.BackgroundTransparency = 1
+traitBulkLabel.Text = "一键兑换100个特质石(500水晶)"
+traitBulkLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+traitBulkLabel.TextSize = 13
+traitBulkLabel.Font = Enum.Font.Gotham
+traitBulkLabel.TextXAlignment = Enum.TextXAlignment.Left
+traitBulkLabel.Parent = traitBulkRow
+
+local traitBulkBtn = Instance.new("TextButton")
+traitBulkBtn.Size = UDim2.new(0, 50, 0, 24)
+traitBulkBtn.Position = UDim2.new(1, -50, 0.5, -12)
+traitBulkBtn.BackgroundColor3 = Color3.fromRGB(0, 122, 255)
+traitBulkBtn.Text = "兑换"
+traitBulkBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+traitBulkBtn.TextSize = 11
+traitBulkBtn.Font = Enum.Font.GothamBold
+traitBulkBtn.AutoButtonColor = false
+local traitBulkCorner = Instance.new("UICorner")
+traitBulkCorner.CornerRadius = UDim.new(0, 6)
+traitBulkCorner.Parent = traitBulkBtn
+traitBulkBtn.Parent = traitBulkRow
+
+traitBulkBtn.MouseButton1Click:Connect(function()
+    task.spawn(function()
+        local event = replicatedStorage:WaitForChild("Events"):WaitForChild("ExchangeTrait")
+        for i = 1, 10 do
+            pcall(function()
+                event:FireServer(10)
+            end)
+            task.wait()
+        end
     end)
 end)
 
