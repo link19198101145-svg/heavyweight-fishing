@@ -4,6 +4,7 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local VirtualInputManager = game:GetService("VirtualInputManager")
+local TeleportService = game:GetService("TeleportService")
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "AutoQuestGUI"
@@ -80,16 +81,18 @@ closeCorner.CornerRadius = UDim.new(0, 12)
 closeCorner.Parent = closeButton
 closeButton.Parent = mainFrame
 
-local navBar = Instance.new("Frame")
+local navBar = Instance.new("ScrollingFrame")
 navBar.Size = UDim2.new(0, 60, 1, -40)
 navBar.Position = UDim2.new(0, 0, 0, 40)
 navBar.BackgroundColor3 = Color3.fromRGB(28, 28, 30)
 navBar.BorderSizePixel = 0
+navBar.ScrollBarThickness = 0
+navBar.CanvasSize = UDim2.new(0, 0, 0, 450)
 navBar.Parent = mainFrame
 
 local fishingNavBtn = Instance.new("TextButton")
 fishingNavBtn.Size = UDim2.new(0, 50, 0, 50)
-fishingNavBtn.Position = UDim2.new(0, 5, 0, 10)
+fishingNavBtn.Position = UDim2.new(0, 5, 0, 5)
 fishingNavBtn.BackgroundColor3 = Color3.fromRGB(0, 122, 255)
 fishingNavBtn.Text = "钓鱼"
 fishingNavBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -103,7 +106,7 @@ fishingNavBtn.Parent = navBar
 
 local ticketNavBtn = Instance.new("TextButton")
 ticketNavBtn.Size = UDim2.new(0, 50, 0, 50)
-ticketNavBtn.Position = UDim2.new(0, 5, 0, 70)
+ticketNavBtn.Position = UDim2.new(0, 5, 0, 60)
 ticketNavBtn.BackgroundColor3 = Color3.fromRGB(58, 58, 60)
 ticketNavBtn.Text = "刷票"
 ticketNavBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -114,6 +117,34 @@ local ticketNavCorner = Instance.new("UICorner")
 ticketNavCorner.CornerRadius = UDim.new(0, 8)
 ticketNavCorner.Parent = ticketNavBtn
 ticketNavBtn.Parent = navBar
+
+local teleportNavBtn = Instance.new("TextButton")
+teleportNavBtn.Size = UDim2.new(0, 50, 0, 50)
+teleportNavBtn.Position = UDim2.new(0, 5, 0, 115)
+teleportNavBtn.BackgroundColor3 = Color3.fromRGB(58, 58, 60)
+teleportNavBtn.Text = "传送"
+teleportNavBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+teleportNavBtn.TextSize = 11
+teleportNavBtn.Font = Enum.Font.GothamBold
+teleportNavBtn.AutoButtonColor = false
+local teleportNavCorner = Instance.new("UICorner")
+teleportNavCorner.CornerRadius = UDim.new(0, 8)
+teleportNavCorner.Parent = teleportNavBtn
+teleportNavBtn.Parent = navBar
+
+local traitNavBtn = Instance.new("TextButton")
+traitNavBtn.Size = UDim2.new(0, 50, 0, 50)
+traitNavBtn.Position = UDim2.new(0, 5, 0, 170)
+traitNavBtn.BackgroundColor3 = Color3.fromRGB(58, 58, 60)
+traitNavBtn.Text = "特制"
+traitNavBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+traitNavBtn.TextSize = 11
+traitNavBtn.Font = Enum.Font.GothamBold
+traitNavBtn.AutoButtonColor = false
+local traitNavCorner = Instance.new("UICorner")
+traitNavCorner.CornerRadius = UDim.new(0, 8)
+traitNavCorner.Parent = traitNavBtn
+traitNavBtn.Parent = navBar
 
 local fishingPage = Instance.new("Frame")
 fishingPage.Size = UDim2.new(1, -60, 1, -40)
@@ -315,11 +346,26 @@ ticketPage.BackgroundTransparency = 1
 ticketPage.Visible = false
 ticketPage.Parent = mainFrame
 
+local ticketScroll = Instance.new("ScrollingFrame")
+ticketScroll.Size = UDim2.new(1, 0, 1, 0)
+ticketScroll.Position = UDim2.new(0, 0, 0, 0)
+ticketScroll.BackgroundTransparency = 1
+ticketScroll.BorderSizePixel = 0
+ticketScroll.ScrollBarThickness = 4
+ticketScroll.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
+ticketScroll.CanvasSize = UDim2.new(0, 0, 1.2, 0)
+ticketScroll.Parent = ticketPage
+
+local ticketContent = Instance.new("Frame")
+ticketContent.Size = UDim2.new(1, 0, 1, 0)
+ticketContent.BackgroundTransparency = 1
+ticketContent.Parent = ticketScroll
+
 local editorRow = Instance.new("Frame")
 editorRow.Size = UDim2.new(0, 260, 0, 30)
 editorRow.Position = UDim2.new(0, 10, 0, 10)
 editorRow.BackgroundTransparency = 1
-editorRow.Parent = ticketPage
+editorRow.Parent = ticketContent
 
 local editorLabel = Instance.new("TextLabel")
 editorLabel.Size = UDim2.new(0, 120, 1, 0)
@@ -344,6 +390,42 @@ local editorOpenCorner = Instance.new("UICorner")
 editorOpenCorner.CornerRadius = UDim.new(0, 6)
 editorOpenCorner.Parent = editorOpenBtn
 editorOpenBtn.Parent = editorRow
+
+local baitShopRow = Instance.new("Frame")
+baitShopRow.Size = UDim2.new(0, 260, 0, 30)
+baitShopRow.Position = UDim2.new(0, 10, 0, 50)
+baitShopRow.BackgroundTransparency = 1
+baitShopRow.Parent = ticketContent
+
+local baitShopLabel = Instance.new("TextLabel")
+baitShopLabel.Size = UDim2.new(0, 120, 1, 0)
+baitShopLabel.BackgroundTransparency = 1
+baitShopLabel.Text = "饵料商城(用100个诱饵)"
+baitShopLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+baitShopLabel.TextSize = 13
+baitShopLabel.Font = Enum.Font.Gotham
+baitShopLabel.TextXAlignment = Enum.TextXAlignment.Left
+baitShopLabel.Parent = baitShopRow
+
+local baitShopBtn = Instance.new("TextButton")
+baitShopBtn.Size = UDim2.new(0, 50, 0, 24)
+baitShopBtn.Position = UDim2.new(1, -50, 0.5, -12)
+baitShopBtn.BackgroundColor3 = Color3.fromRGB(0, 122, 255)
+baitShopBtn.Text = "打开"
+baitShopBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+baitShopBtn.TextSize = 11
+baitShopBtn.Font = Enum.Font.GothamBold
+baitShopBtn.AutoButtonColor = false
+local baitShopCorner = Instance.new("UICorner")
+baitShopCorner.CornerRadius = UDim.new(0, 6)
+baitShopCorner.Parent = baitShopBtn
+baitShopBtn.Parent = baitShopRow
+
+baitShopBtn.MouseButton1Click:Connect(function()
+    pcall(function()
+        replicatedStorage:WaitForChild("Events"):WaitForChild("ChooseDialogueOption"):FireServer("BuyBait", 1, "BaitShop")
+    end)
+end)
 
 local editorFrame = Instance.new("Frame")
 editorFrame.Size = UDim2.new(0, 200, 0, 130)
@@ -463,20 +545,20 @@ end)
 
 local modeLabel = Instance.new("TextLabel")
 modeLabel.Size = UDim2.new(1, -20, 0, 20)
-modeLabel.Position = UDim2.new(0, 10, 0, 50)
+modeLabel.Position = UDim2.new(0, 10, 0, 90)
 modeLabel.BackgroundTransparency = 1
 modeLabel.Text = "模式选择:"
 modeLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 modeLabel.TextSize = 13
 modeLabel.Font = Enum.Font.Gotham
 modeLabel.TextXAlignment = Enum.TextXAlignment.Left
-modeLabel.Parent = ticketPage
+modeLabel.Parent = ticketContent
 
 local modeContainer = Instance.new("Frame")
 modeContainer.Size = UDim2.new(0, 260, 0, 30)
-modeContainer.Position = UDim2.new(0, 10, 0, 71)
+modeContainer.Position = UDim2.new(0, 10, 0, 111)
 modeContainer.BackgroundTransparency = 1
-modeContainer.Parent = ticketPage
+modeContainer.Parent = ticketContent
 
 local acceptModeBtn = Instance.new("TextButton")
 acceptModeBtn.Size = UDim2.new(0, 125, 0, 28)
@@ -509,46 +591,46 @@ local currentMode = "accept"
 
 local historyLabel = Instance.new("TextLabel")
 historyLabel.Size = UDim2.new(1, -20, 0, 20)
-historyLabel.Position = UDim2.new(0, 10, 0, 105)
+historyLabel.Position = UDim2.new(0, 10, 0, 145)
 historyLabel.BackgroundTransparency = 1
 historyLabel.Text = "本次: 接0 交0 | 历史: 接0 交0"
 historyLabel.TextColor3 = Color3.fromRGB(150, 150, 155)
 historyLabel.TextSize = 11
 historyLabel.Font = Enum.Font.GothamMedium
 historyLabel.TextXAlignment = Enum.TextXAlignment.Left
-historyLabel.Parent = ticketPage
+historyLabel.Parent = ticketContent
 
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(1, -20, 0, 25)
-statusLabel.Position = UDim2.new(0, 10, 0, 125)
+statusLabel.Position = UDim2.new(0, 10, 0, 165)
 statusLabel.BackgroundTransparency = 1
 statusLabel.Text = "状态: 已停止"
 statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
 statusLabel.TextSize = 14
 statusLabel.Font = Enum.Font.Gotham
 statusLabel.TextXAlignment = Enum.TextXAlignment.Left
-statusLabel.Parent = ticketPage
+statusLabel.Parent = ticketContent
 
 local speedLabel = Instance.new("TextLabel")
 speedLabel.Size = UDim2.new(1, -20, 0, 25)
-speedLabel.Position = UDim2.new(0, 10, 0, 148)
+speedLabel.Position = UDim2.new(0, 10, 0, 188)
 speedLabel.BackgroundTransparency = 1
 speedLabel.Text = "速度: 0.50秒/次"
 speedLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 speedLabel.TextSize = 14
 speedLabel.Font = Enum.Font.Gotham
 speedLabel.TextXAlignment = Enum.TextXAlignment.Left
-speedLabel.Parent = ticketPage
+speedLabel.Parent = ticketContent
 
 local sliderBg = Instance.new("Frame")
 sliderBg.Size = UDim2.new(0, 210, 0, 6)
-sliderBg.Position = UDim2.new(0, 35, 0, 180)
+sliderBg.Position = UDim2.new(0, 35, 0, 220)
 sliderBg.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 sliderBg.BorderSizePixel = 0
 local sliderBgCorner = Instance.new("UICorner")
 sliderBgCorner.CornerRadius = UDim.new(0, 3)
 sliderBgCorner.Parent = sliderBg
-sliderBg.Parent = ticketPage
+sliderBg.Parent = ticketContent
 
 local sliderFill = Instance.new("Frame")
 sliderFill.Size = UDim2.new(0.5, 0, 1, 0)
@@ -609,7 +691,7 @@ end)
 
 local actionBtn = Instance.new("TextButton")
 actionBtn.Size = UDim2.new(0, 230, 0, 35)
-actionBtn.Position = UDim2.new(0, 25, 0, 195)
+actionBtn.Position = UDim2.new(0, 25, 0, 235)
 actionBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
 actionBtn.Text = "开始"
 actionBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -618,7 +700,7 @@ actionBtn.Font = Enum.Font.GothamBold
 local actionCorner = Instance.new("UICorner")
 actionCorner.CornerRadius = UDim.new(0, 6)
 actionCorner.Parent = actionBtn
-actionBtn.Parent = ticketPage
+actionBtn.Parent = ticketContent
 
 local running = false
 local taskCount, lastTaskTime = 0, 0
@@ -628,6 +710,167 @@ local totalAccept, totalSubmit = 0, 0
 local function updateHistory()
     historyLabel.Text = string.format("本次: 接%d 交%d | 历史: 接%d 交%d", sessionAccept, sessionSubmit, totalAccept, totalSubmit)
 end
+
+local teleportPage = Instance.new("Frame")
+teleportPage.Size = UDim2.new(1, -60, 1, -40)
+teleportPage.Position = UDim2.new(0, 60, 0, 40)
+teleportPage.BackgroundTransparency = 1
+teleportPage.Visible = false
+teleportPage.Parent = mainFrame
+
+local teleportLocations = {
+    {name = "初始岛(钓250条鱼,没有无我)", pos = Vector3.new(-221, 6, -26), color = Color3.fromRGB(50, 200, 50)},
+    {name = "琥珀岛(钓250条鱼,有无我)", pos = Vector3.new(1259, 7, 1401), color = Color3.fromRGB(255, 180, 50)},
+    {name = "战场岛(钓5条1M以上重量的boss)", pos = Vector3.new(1393, 7, 170), color = Color3.fromRGB(255, 80, 80)}
+}
+
+for i, loc in ipairs(teleportLocations) do
+    local card = Instance.new("Frame")
+    card.Size = UDim2.new(0, 260, 0, 50)
+    card.Position = UDim2.new(0, 10, 0, 10 + (i-1)*62)
+    card.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+    card.BorderSizePixel = 0
+    local cardCorner = Instance.new("UICorner")
+    cardCorner.CornerRadius = UDim.new(0, 8)
+    cardCorner.Parent = card
+    card.Parent = teleportPage
+
+    local colorBar = Instance.new("Frame")
+    colorBar.Size = UDim2.new(0, 4, 1, -16)
+    colorBar.Position = UDim2.new(0, 10, 0, 8)
+    colorBar.BackgroundColor3 = loc.color
+    colorBar.BorderSizePixel = 0
+    local barCorner = Instance.new("UICorner")
+    barCorner.CornerRadius = UDim.new(0, 2)
+    barCorner.Parent = colorBar
+    colorBar.Parent = card
+
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(0, 120, 1, 0)
+    nameLabel.Position = UDim2.new(0, 22, 0, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = loc.name
+    nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    nameLabel.TextSize = 14
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    nameLabel.Parent = card
+
+    local coordsLabel = Instance.new("TextLabel")
+    coordsLabel.Size = UDim2.new(0, 120, 0, 14)
+    coordsLabel.Position = UDim2.new(0, 22, 0, 26)
+    coordsLabel.BackgroundTransparency = 1
+    coordsLabel.Text = string.format("X: %d  Y: %d  Z: %d", loc.pos.X, loc.pos.Y, loc.pos.Z)
+    coordsLabel.TextColor3 = Color3.fromRGB(120, 120, 125)
+    coordsLabel.TextSize = 9
+    coordsLabel.Font = Enum.Font.Gotham
+    coordsLabel.TextXAlignment = Enum.TextXAlignment.Left
+    coordsLabel.Parent = card
+
+    local teleportBtn = Instance.new("TextButton")
+    teleportBtn.Size = UDim2.new(0, 60, 0, 30)
+    teleportBtn.Position = UDim2.new(1, -70, 0.5, -15)
+    teleportBtn.BackgroundColor3 = loc.color
+    teleportBtn.Text = "传送"
+    teleportBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    teleportBtn.TextSize = 12
+    teleportBtn.Font = Enum.Font.GothamBold
+    teleportBtn.AutoButtonColor = false
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 6)
+    btnCorner.Parent = teleportBtn
+    teleportBtn.Parent = card
+
+    teleportBtn.MouseButton1Click:Connect(function()
+        local char = Players.LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            char.HumanoidRootPart.CFrame = CFrame.new(loc.pos)
+        end
+    end)
+end
+
+local traitPage = Instance.new("Frame")
+traitPage.Size = UDim2.new(1, -60, 1, -40)
+traitPage.Position = UDim2.new(0, 60, 0, 40)
+traitPage.BackgroundTransparency = 1
+traitPage.Visible = false
+traitPage.Parent = mainFrame
+
+local traitOpenRow = Instance.new("Frame")
+traitOpenRow.Size = UDim2.new(0, 260, 0, 30)
+traitOpenRow.Position = UDim2.new(0, 10, 0, 10)
+traitOpenRow.BackgroundTransparency = 1
+traitOpenRow.Parent = traitPage
+
+local traitLabel = Instance.new("TextLabel")
+traitLabel.Size = UDim2.new(0, 120, 1, 0)
+traitLabel.BackgroundTransparency = 1
+traitLabel.Text = "特制抽取"
+traitLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+traitLabel.TextSize = 13
+traitLabel.Font = Enum.Font.Gotham
+traitLabel.TextXAlignment = Enum.TextXAlignment.Left
+traitLabel.Parent = traitOpenRow
+
+local traitOpenBtn = Instance.new("TextButton")
+traitOpenBtn.Size = UDim2.new(0, 50, 0, 24)
+traitOpenBtn.Position = UDim2.new(1, -50, 0.5, -12)
+traitOpenBtn.BackgroundColor3 = Color3.fromRGB(0, 122, 255)
+traitOpenBtn.Text = "打开"
+traitOpenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+traitOpenBtn.TextSize = 11
+traitOpenBtn.Font = Enum.Font.GothamBold
+traitOpenBtn.AutoButtonColor = false
+local traitOpenCorner = Instance.new("UICorner")
+traitOpenCorner.CornerRadius = UDim.new(0, 6)
+traitOpenCorner.Parent = traitOpenBtn
+traitOpenBtn.Parent = traitOpenRow
+
+traitOpenBtn.MouseButton1Click:Connect(function()
+    pcall(function()
+        replicatedStorage:WaitForChild("Events"):WaitForChild("ChooseDialogueOption"):FireServer("Nanjiang", 1, "OpenTrait", {
+            workspace:WaitForChild("NPC"):WaitForChild("Function"):WaitForChild("Nanjiang")
+        })
+    end)
+end)
+
+local traitExchangeRow = Instance.new("Frame")
+traitExchangeRow.Size = UDim2.new(0, 260, 0, 30)
+traitExchangeRow.Position = UDim2.new(0, 10, 0, 50)
+traitExchangeRow.BackgroundTransparency = 1
+traitExchangeRow.Parent = traitPage
+
+local traitExchangeLabel = Instance.new("TextLabel")
+traitExchangeLabel.Size = UDim2.new(0, 120, 1, 0)
+traitExchangeLabel.BackgroundTransparency = 1
+traitExchangeLabel.Text = "特质石交换(或许我以后会写一次交换指定数量)"
+traitExchangeLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+traitExchangeLabel.TextSize = 13
+traitExchangeLabel.Font = Enum.Font.Gotham
+traitExchangeLabel.TextXAlignment = Enum.TextXAlignment.Left
+traitExchangeLabel.Parent = traitExchangeRow
+
+local traitExchangeBtn = Instance.new("TextButton")
+traitExchangeBtn.Size = UDim2.new(0, 50, 0, 24)
+traitExchangeBtn.Position = UDim2.new(1, -50, 0.5, -12)
+traitExchangeBtn.BackgroundColor3 = Color3.fromRGB(0, 122, 255)
+traitExchangeBtn.Text = "打开"
+traitExchangeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+traitExchangeBtn.TextSize = 11
+traitExchangeBtn.Font = Enum.Font.GothamBold
+traitExchangeBtn.AutoButtonColor = false
+local traitExchangeCorner = Instance.new("UICorner")
+traitExchangeCorner.CornerRadius = UDim.new(0, 6)
+traitExchangeCorner.Parent = traitExchangeBtn
+traitExchangeBtn.Parent = traitExchangeRow
+
+traitExchangeBtn.MouseButton1Click:Connect(function()
+    pcall(function()
+        replicatedStorage:WaitForChild("Events"):WaitForChild("ChooseDialogueOption"):FireServer("Nanjiang", 2, "OpenTraitExchange", {
+            workspace:WaitForChild("NPC"):WaitForChild("Function"):WaitForChild("Nanjiang")
+        })
+    end)
+end)
 
 local miniFrame = Instance.new("TextButton")
 miniFrame.Size = UDim2.new(0, 180, 0, 45)
@@ -693,13 +936,19 @@ end)
 local function switchPage(page)
     fishingPage.Visible = page == "fishing"
     ticketPage.Visible = page == "ticket"
+    teleportPage.Visible = page == "teleport"
+    traitPage.Visible = page == "trait"
     fishingNavBtn.BackgroundColor3 = page == "fishing" and Color3.fromRGB(0, 122, 255) or Color3.fromRGB(58, 58, 60)
     ticketNavBtn.BackgroundColor3 = page == "ticket" and Color3.fromRGB(0, 122, 255) or Color3.fromRGB(58, 58, 60)
-    title.Text = page == "fishing" and "钓鱼功能🎣" or "刷票功能😱"
+    teleportNavBtn.BackgroundColor3 = page == "teleport" and Color3.fromRGB(0, 122, 255) or Color3.fromRGB(58, 58, 60)
+    traitNavBtn.BackgroundColor3 = page == "trait" and Color3.fromRGB(0, 122, 255) or Color3.fromRGB(58, 58, 60)
+    title.Text = page == "fishing" and "钓鱼功能🎣" or (page == "ticket" and "刷票功能😱" or (page == "teleport" and "传送功能📍(我已经最多程度减少被封风险)" or "特制功能🎲"))
 end
 
 fishingNavBtn.MouseButton1Click:Connect(function() switchPage("fishing") end)
 ticketNavBtn.MouseButton1Click:Connect(function() switchPage("ticket") end)
+teleportNavBtn.MouseButton1Click:Connect(function() switchPage("teleport") end)
+traitNavBtn.MouseButton1Click:Connect(function() switchPage("trait") end)
 
 local function setMode(m)
     currentMode = m
