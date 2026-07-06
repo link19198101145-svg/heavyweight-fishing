@@ -731,9 +731,24 @@ teleportPage.BackgroundTransparency = 1
 teleportPage.Visible = false
 teleportPage.Parent = mainFrame
 
+local teleportScroll = Instance.new("ScrollingFrame")
+teleportScroll.Size = UDim2.new(1, 0, 1, 0)
+teleportScroll.Position = UDim2.new(0, 0, 0, 0)
+teleportScroll.BackgroundTransparency = 1
+teleportScroll.BorderSizePixel = 0
+teleportScroll.ScrollBarThickness = 4
+teleportScroll.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
+teleportScroll.CanvasSize = UDim2.new(0, 0, 0, 560)
+teleportScroll.Parent = teleportPage
+
 local teleportLocations = {
-    {name = "初始岛(钓250条鱼,没有无我)", pos = Vector3.new(-221, 6, -26), color = Color3.fromRGB(50, 200, 50)},
-    {name = "琥珀岛(钓250条鱼,有无我)", pos = Vector3.new(1259, 7, 1401), color = Color3.fromRGB(255, 180, 50)},
+    {name = "初始岛", pos = Vector3.new(-221, 6, -26), color = Color3.fromRGB(50, 200, 50)},
+    {name = "竹子岛(暴风雨)", pos = Vector3.new(-1223, 7, -24), color = Color3.fromRGB(100, 200, 100)},
+    {name = "核弹岛(下雨)", pos = Vector3.new(66, 7, 1181), color = Color3.fromRGB(255, 100, 100)},
+    {name = "鲈鱼岛(有风)", pos = Vector3.new(-62, 9, -1321), color = Color3.fromRGB(100, 180, 255)},
+    {name = "冰霜岛(下雪)", pos = Vector3.new(-1366, 9, -1495), color = Color3.fromRGB(150, 200, 255)},
+    {name = "椰子岛(雾蒙蒙的)", pos = Vector3.new(1494, 7, -1431), color = Color3.fromRGB(255, 220, 100)},
+    {name = "琥珀岛(烈阳高照)", pos = Vector3.new(1259, 7, 1401), color = Color3.fromRGB(255, 180, 50)},
     {name = "战场岛(钓5条1M以上重量的boss)", pos = Vector3.new(1393, 7, 170), color = Color3.fromRGB(255, 80, 80)}
 }
 
@@ -746,7 +761,7 @@ for i, loc in ipairs(teleportLocations) do
     local cardCorner = Instance.new("UICorner")
     cardCorner.CornerRadius = UDim.new(0, 8)
     cardCorner.Parent = card
-    card.Parent = teleportPage
+    card.Parent = teleportScroll
 
     local colorBar = Instance.new("Frame")
     colorBar.Size = UDim2.new(0, 4, 1, -16)
@@ -759,7 +774,7 @@ for i, loc in ipairs(teleportLocations) do
     colorBar.Parent = card
 
     local nameLabel = Instance.new("TextLabel")
-    nameLabel.Size = UDim2.new(0, 120, 1, 0)
+    nameLabel.Size = UDim2.new(0, 180, 1, 0)
     nameLabel.Position = UDim2.new(0, 22, 0, 0)
     nameLabel.BackgroundTransparency = 1
     nameLabel.Text = loc.name
@@ -770,7 +785,7 @@ for i, loc in ipairs(teleportLocations) do
     nameLabel.Parent = card
 
     local coordsLabel = Instance.new("TextLabel")
-    coordsLabel.Size = UDim2.new(0, 120, 0, 14)
+    coordsLabel.Size = UDim2.new(0, 180, 0, 14)
     coordsLabel.Position = UDim2.new(0, 22, 0, 26)
     coordsLabel.BackgroundTransparency = 1
     coordsLabel.Text = string.format("X: %d  Y: %d  Z: %d", loc.pos.X, loc.pos.Y, loc.pos.Z)
@@ -818,7 +833,7 @@ traitOpenRow.Parent = traitPage
 local traitLabel = Instance.new("TextLabel")
 traitLabel.Size = UDim2.new(0, 120, 1, 0)
 traitLabel.BackgroundTransparency = 1
-traitLabel.Text = "打开特制抽取界面"
+traitLabel.Text = "打开特制抽取"
 traitLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 traitLabel.TextSize = 13
 traitLabel.Font = Enum.Font.Gotham
@@ -856,7 +871,7 @@ traitExchangeRow.Parent = traitPage
 local traitExchangeLabel = Instance.new("TextLabel")
 traitExchangeLabel.Size = UDim2.new(0, 120, 1, 0)
 traitExchangeLabel.BackgroundTransparency = 1
-traitExchangeLabel.Text = "打开特制石兑换(交换1个或10个)"
+traitExchangeLabel.Text = "打开特质石交换(1个或10个)"
 traitExchangeLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 traitExchangeLabel.TextSize = 13
 traitExchangeLabel.Font = Enum.Font.Gotham
@@ -894,7 +909,7 @@ traitBulkRow.Parent = traitPage
 local traitBulkLabel = Instance.new("TextLabel")
 traitBulkLabel.Size = UDim2.new(0, 120, 1, 0)
 traitBulkLabel.BackgroundTransparency = 1
-traitBulkLabel.Text = "一键兑换100个特质石(500水晶)"
+traitBulkLabel.Text = "交换100个特质石(500水晶)"
 traitBulkLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 traitBulkLabel.TextSize = 13
 traitBulkLabel.Font = Enum.Font.Gotham
@@ -905,7 +920,7 @@ local traitBulkBtn = Instance.new("TextButton")
 traitBulkBtn.Size = UDim2.new(0, 50, 0, 24)
 traitBulkBtn.Position = UDim2.new(1, -50, 0.5, -12)
 traitBulkBtn.BackgroundColor3 = Color3.fromRGB(0, 122, 255)
-traitBulkBtn.Text = "兑换"
+traitBulkBtn.Text = "交换"
 traitBulkBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 traitBulkBtn.TextSize = 11
 traitBulkBtn.Font = Enum.Font.GothamBold
@@ -997,7 +1012,7 @@ local function switchPage(page)
     ticketNavBtn.BackgroundColor3 = page == "ticket" and Color3.fromRGB(0, 122, 255) or Color3.fromRGB(58, 58, 60)
     teleportNavBtn.BackgroundColor3 = page == "teleport" and Color3.fromRGB(0, 122, 255) or Color3.fromRGB(58, 58, 60)
     traitNavBtn.BackgroundColor3 = page == "trait" and Color3.fromRGB(0, 122, 255) or Color3.fromRGB(58, 58, 60)
-    title.Text = page == "fishing" and "钓鱼功能🎣" or (page == "ticket" and "刷票功能😱" or (page == "teleport" and "传送功能📍(我已经最多程度减少被封风险)" or "特制功能🎲"))
+    title.Text = page == "fishing" and "钓鱼功能🎣" or (page == "ticket" and "刷票功能😱" or (page == "teleport" and "传送功能📍" or "特制功能🎲"))
 end
 
 fishingNavBtn.MouseButton1Click:Connect(function() switchPage("fishing") end)
