@@ -521,7 +521,7 @@ local fishingNavBtn = createNavButton("钓鱼", "🎣", 8)
 local bossNavBtn = createNavButton("Boss", "💀", 60)
 local ticketNavBtn = createNavButton("刷票", "🎫", 112)
 local teleportNavBtn = createNavButton("传送", "📍", 164)
-local traitNavBtn = createNavButton("特制/角色升级", "🎲", 216)
+local traitNavBtn = createNavButton("特制", "🎲", 216)
 
 local pageContainer = Instance.new("Frame")
 pageContainer.Size = UDim2.new(1, -56, 1, -36)
@@ -541,7 +541,7 @@ fishingScroll.BackgroundTransparency = 1
 fishingScroll.BorderSizePixel = 0
 fishingScroll.ScrollBarThickness = 3
 fishingScroll.ScrollBarImageColor3 = Color3.fromRGB(60, 60, 65)
-fishingScroll.CanvasSize = UDim2.new(0, 0, 0, 300)
+fishingScroll.CanvasSize = UDim2.new(0, 0, 0, 260)
 fishingScroll.Parent = fishingPage
 
 local function createToggleRow(label, defaultState, yPos, parent)
@@ -729,69 +729,6 @@ autoSellBtn.MouseButton1Click:Connect(function()
     else
         autoSellBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 60)
         autoSellBtn.Text = "关闭"
-    end
-end)
-
-getgenv().WhiteTea_AutoFavorite = false
-
-local autoFavoriteBtn, _ = createToggleRow("自动收藏诱饵材料", false, 236, fishingScroll)
-
-autoFavoriteBtn.MouseButton1Click:Connect(function()
-    getgenv().WhiteTea_AutoFavorite = not getgenv().WhiteTea_AutoFavorite
-    if getgenv().WhiteTea_AutoFavorite then
-        autoFavoriteBtn.BackgroundColor3 = Color3.fromRGB(60, 200, 80)
-        autoFavoriteBtn.Text = "开启"
-        task.spawn(function()
-            local favoriteEvent = replicatedStorage.Events.FavoriteItem
-            local targetFish = {
-                "Colossal Tigerfish",
-                "Heavenpiercer Turtle",
-                "Golden Guardian Fish",
-                "Crimson Electric Eel",
-                "Frost Kingfish",
-                "Ascended Perch",
-                "Primordial Kunfish Overlord",
-                "Warbringer Shark"
-            }
-            while getgenv().WhiteTea_AutoFavorite do
-                pcall(function()
-                    local scroll = Players.LocalPlayer.PlayerGui.MainGui.Main.Inventory.Main.List.ScrollingFrame
-                    for _, child in ipairs(scroll:GetChildren()) do
-                        if child:IsA("GuiObject") then
-                            local fishText = ""
-                            for _, label in ipairs(child:GetDescendants()) do
-                                if label:IsA("TextLabel") then
-                                    for _, name in ipairs(targetFish) do
-                                        if string.find(label.Text, name) then
-                                            fishText = label.Text
-                                            break
-                                        end
-                                    end
-                                end
-                                if fishText ~= "" then break end
-                            end
-                            if fishText ~= "" then
-                                local weight = fishText:match("%(([%d.]+) KG%)")
-                                local name = ""
-                                for _, n in ipairs(targetFish) do
-                                    if string.find(fishText, n) then
-                                        name = n
-                                        break
-                                    end
-                                end
-                                if name ~= "" and weight then
-                                    favoriteEvent:FireServer(name .. " | " .. weight)
-                                end
-                            end
-                        end
-                    end
-                end)
-                task.wait(1)
-            end
-        end)
-    else
-        autoFavoriteBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 60)
-        autoFavoriteBtn.Text = "关闭"
     end
 end)
 
@@ -1642,7 +1579,6 @@ closeButton.MouseButton1Click:Connect(function()
     getgenv().WhiteTea_WeatherNotify = false
     getgenv().WhiteTea_BossQTE = false
     getgenv().WhiteTea_EnzoCam = false
-    getgenv().WhiteTea_AutoFavorite = false
     getgenv().WhiteTea_AutoBuyBait = false
     getgenv().WhiteTea_AutoQuest = false
     screenGui:Destroy()
