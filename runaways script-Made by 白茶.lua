@@ -14,13 +14,13 @@ local SETTINGS = {
     KillInterval = 0.1,
     CollectRange = 200,
     CollectInterval = 0.05,
-    BarrierRadius = 10,
-    BarrierHeight = 15,
-    PyramidHeight = 8,
+    BarrierRadius = 20,
+    BarrierHeight = 20,
     WallThickness = 1,
     BarrierTransparency = 0.3,
     ScanInterval = 0.5,
     SpeedLimit = 250,
+    AmmoAmount = 999,
 }
 
 local lastKill = 0
@@ -29,9 +29,11 @@ local killEnabled = false
 local collectEnabled = false
 local barrierEnabled = false
 local antiFlyEnabled = false
+local ammoEnabled = false
 local killConnection = nil
 local collectConnection = nil
 local antiFlyConnection = nil
+local ammoConnection = nil
 
 local barrierParts = {}
 local barrierActive = false
@@ -112,6 +114,30 @@ local function collectLoot()
     end
 end
 
+local function setAmmo()
+    local character = LocalPlayer.Character
+    local targets = {}
+
+    if character then
+        for _, tool in ipairs(character:GetChildren()) do
+            if tool:IsA("Tool") then
+                table.insert(targets, tool)
+            end
+        end
+    end
+
+    local backpack = LocalPlayer:WaitForChild("Backpack")
+    for _, tool in ipairs(backpack:GetChildren()) do
+        if tool:IsA("Tool") then
+            table.insert(targets, tool)
+        end
+    end
+
+    for _, tool in ipairs(targets) do
+        ClientEvent:FireServer("Ammo", "setAmmo", tool, SETTINGS.AmmoAmount)
+    end
+end
+
 local function startKillLoop()
     if killConnection then return end
     killConnection = RunService.RenderStepped:Connect(function()
@@ -168,43 +194,18 @@ local function stopAntiFly()
     end
 end
 
-local function createPyramidRoof(myPos)
-    local pyramidParts = {}
-    local sides = 16
+local function startAmmoLoop()
+    if ammoConnection then return end
+    ammoConnection = RunService.RenderStepped:Connect(function()
+        setAmmo()
+    end)
+end
 
-    for i = 0, sides - 1 do
-        local angle1 = i * (math.pi * 2) / sides
-        local angle2 = (i + 1) * (math.pi * 2) / sides
-
-        local base1 = Vector3.new(math.cos(angle1) * SETTINGS.BarrierRadius, SETTINGS.BarrierHeight, math.sin(angle1) * SETTINGS.BarrierRadius)
-        local base2 = Vector3.new(math.cos(angle2) * SETTINGS.BarrierRadius, SETTINGS.BarrierHeight, math.sin(angle2) * SETTINGS.BarrierRadius)
-        local apex = Vector3.new(0, SETTINGS.BarrierHeight + SETTINGS.PyramidHeight, 0)
-
-        local midPoint = (base1 + base2) / 2
-        local center = myPos + midPoint
-
-        local edgeLength = (base2 - base1).Magnitude
-        local slantLength = (apex - base1).Magnitude
-
-        local face = Instance.new("Part")
-        face.Name = "PyramidFace"
-        face.Size = Vector3.new(edgeLength, SETTINGS.WallThickness, slantLength)
-        face.Anchored = true
-        face.CanCollide = true
-        face.Transparency = SETTINGS.BarrierTransparency
-        face.Material = Enum.Material.ForceField
-        face.BrickColor = BrickColor.new("Cyan")
-
-        local direction = (myPos + apex) - center
-        face.CFrame = CFrame.lookAt(center, myPos + apex)
-        face.Position = (center + myPos + apex) / 2
-
-        face.Parent = workspace
-        table.insert(barrierParts, face)
-        table.insert(pyramidParts, face)
+local function stopAmmoLoop()
+    if ammoConnection then
+        ammoConnection:Disconnect()
+        ammoConnection = nil
     end
-
-    return pyramidParts
 end
 
 local function createBarrier()
@@ -224,14 +225,14 @@ local function createBarrier()
     end
 
     local myPos = myRoot.Position
-    local wallCount = 16
+    local wallCount = 32
     local angleStep = (math.pi * 2) / wallCount
 
     for i = 0, wallCount - 1 do
         local angle = i * angleStep
         local wall = Instance.new("Part")
         wall.Name = "Barrier"
-        wall.Size = Vector3.new(SETTINGS.BarrierRadius * math.pi / wallCount + SETTINGS.WallThickness * 2, SETTINGS.BarrierHeight, SETTINGS.WallThickness)
+        wall.Size = Vector3.new(SETTINGS.BarrierRadius * math.pi / wallCount + SETTINGS.WallThickness * 3, SETTINGS.BarrierHeight, SETTINGS.WallThickness)
         wall.Anchored = true
         wall.CanCollide = true
         wall.Transparency = SETTINGS.BarrierTransparency
@@ -269,7 +270,23 @@ local function createBarrier()
         emitter.Parent = wall
     end
 
-    createPyramidRoof(myPos)
+    local roof = Instance.new("Part")
+    roof.Name = "Barrier"
+    roof.Size = Vector3.new(SETTINGS.BarrierRadius * 2.5, SETTINGS.WallThickness, SETTINGS.BarrierRadius * 2.5)
+    roof.Anchored = true
+    roof.CanCollide = true
+    roof.Transparency = SETTINGS.BarrierTransparency
+    roof.Material = Enum.Material.ForceField
+    roof.BrickColor = BrickColor.new("Cyan")
+    roof.Position = myPos + Vector3.new(0, SETTINGS.BarrierHeight, 0)
+    roof.Parent = workspace
+    table.insert(barrierParts, roof)
+
+    local roofGlow = Instance.new("PointLight")
+    roofGlow.Color = Color3.fromRGB(0, 200, 255)
+    roofGlow.Brightness = 2
+    roofGlow.Range = 12
+    roofGlow.Parent = roof
 end
 
 local function destroyBarrier()
@@ -290,7 +307,7 @@ local function updateBarrier()
     if not myRoot then return end
 
     local myPos = myRoot.Position
-    local wallCount = 16
+    local wallCount = 32
     local angleStep = (math.pi * 2) / wallCount
 
     for i = 0, wallCount - 1 do
@@ -311,28 +328,10 @@ local function updateBarrier()
         end
     end
 
-    local pyramidStart = wallCount + 1
-    local sides = 16
-
-    for i = 0, sides - 1 do
-        local face = barrierParts[pyramidStart + i]
-        if face and face.Parent then
-            local angle1 = i * (math.pi * 2) / sides
-            local angle2 = (i + 1) * (math.pi * 2) / sides
-
-            local base1 = Vector3.new(math.cos(angle1) * SETTINGS.BarrierRadius, SETTINGS.BarrierHeight, math.sin(angle1) * SETTINGS.BarrierRadius)
-            local base2 = Vector3.new(math.cos(angle2) * SETTINGS.BarrierRadius, SETTINGS.BarrierHeight, math.sin(angle2) * SETTINGS.BarrierRadius)
-            local apex = Vector3.new(0, SETTINGS.BarrierHeight + SETTINGS.PyramidHeight, 0)
-
-            local midPoint = (base1 + base2) / 2
-            local center = myPos + midPoint
-            local worldApex = myPos + apex
-
-            face.CFrame = CFrame.lookAt(center, worldApex)
-            face.Position = (center + worldApex) / 2
-
-            face.BrickColor = BrickColor.new(Color3.fromHSV(hue, 1, 1))
-        end
+    local roof = barrierParts[wallCount + 1]
+    if roof and roof.Parent then
+        roof.Position = myPos + Vector3.new(0, SETTINGS.BarrierHeight, 0)
+        roof.BrickColor = BrickColor.new(Color3.fromHSV(hue, 1, 1))
     end
 end
 
@@ -415,7 +414,7 @@ scrollFrame.BackgroundTransparency = 1
 scrollFrame.BorderSizePixel = 0
 scrollFrame.ScrollBarThickness = 3
 scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(60, 60, 65)
-scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 310)
+scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 360)
 scrollFrame.Parent = mainFrame
 
 local scrollContent = Instance.new("Frame")
@@ -449,6 +448,7 @@ closeBtn.MouseButton1Click:Connect(function()
     stopKillLoop()
     stopCollectLoop()
     stopAntiFly()
+    stopAmmoLoop()
     destroyBarrier()
     screenGui:Destroy()
 end)
@@ -634,7 +634,7 @@ createToggle("物品收集", 110, function(state)
     end
 end)
 
-createToggle("直升机屏障", 160, function(state)
+createToggle("防直升机", 160, function(state)
     barrierEnabled = state
     if state then
         if not barrierActive and detectHeli() then
@@ -651,6 +651,15 @@ createToggle("绕过反飞行", 210, function(state)
         startAntiFly()
     else
         stopAntiFly()
+    end
+end)
+
+createToggle("无限弹药", 260, function(state)
+    ammoEnabled = state
+    if state then
+        startAmmoLoop()
+    else
+        stopAmmoLoop()
     end
 end)
 
