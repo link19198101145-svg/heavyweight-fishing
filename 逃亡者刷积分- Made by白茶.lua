@@ -7,8 +7,7 @@ local LocalPlayer = Players.LocalPlayer
 
 local Event = ReplicatedStorage.FlowClient.ClientRunner.Event
 
--- 保存自己的源代码（需要注入器支持 getscriptsource）
-local SCRIPT_URL = "https://你的服务器/autofarm.lua"  -- 或本地路径
+local SCRIPT_URL = "https://raw.githubusercontent.com/link19198101145-svg/heavyweight-fishing/main/逃亡者刷积分-%20Made%20by白茶.lua"
 
 local END_POS = CFrame.new(805, 1500, 83729)
 
@@ -45,12 +44,10 @@ local function main()
     Event:FireServer("Passout", "Abandon")
     task.wait(1)
     replay()
-
-    -- 脚本结束后重新加入服务器（触发自动重跑）
-    task.wait(5)
-    pcall(function()
-        TeleportService:Teleport(game.PlaceId, LocalPlayer)
-    end)
 end
 
 main()
+
+if queue_on_teleport then
+    queue_on_teleport('loadstring(game:HttpGet("' .. SCRIPT_URL .. '"))()')
+end
