@@ -21,7 +21,7 @@ local SETTINGS = {
     BarrierTransparency = 0.3,
     ScanInterval = 0.5,
     MoveDirection = (Vector3.new(70, 2155, -7897) - Vector3.new(70, 2155, -7950)).Unit,
-    MoveStep = 100,
+    MoveStep = 200,
     MoveInterval = 0.15,
     DestroyWait = 3.5,
 }
