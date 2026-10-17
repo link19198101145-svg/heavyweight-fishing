@@ -1,0 +1,604 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+
+local Event = ReplicatedStorage.FlowClient.ClientRunner.Event
+
+local SETTINGS = {
+    Damage = 9999,
+    CacheDuration = 1,
+    TeleportCandyInterval = 0.15,
+    CandyTouchTimeout = 0.75,
+    KillNPCRange = 1000,
+    KillNPCDamage = 9999,
+    KillNPCMaxPerTick = 5,
+    MaxBuildingsPerScan = 10,
+    BarrierRadius = 20,
+    BarrierHeight = 20,
+    WallThickness = 1,
+    BarrierTransparency = 0.3,
+    ScanInterval = 0.5,
+    MoveDirection = (Vector3.new(70, 2155, -7897) - Vector3.new(70, 2155, -7950)).Unit,
+    MoveStep = 100,
+    MoveInterval = 0.15,
+    DestroyWait = 3.5,
+}
+
+local TARGET_NAMES = {
+    CoffeeMachine = true,
+    CashRegister = true,
+    VendingMachine = true,
+    ATM = true,
+    Coffin = true,
+    PumpkinSmall = true,
+    PumpkinLarge = true,
+    Dumpster = true,
+    MailBox = true,
+    GarbageCan = true,
+    NightStand = true,
+}
+
+local lastTeleportCandy = 0
+local lastMove = 0
+local lastScan = 0
+local lastReplay = tick()
+local cachedTargets = {}
+local cacheTime = 0
+local blacklist = {}
+local currentSensor = nil
+local currentSensorTime = 0
+local barrierParts = {}
+local barrierActive = false
+local hue = 0
+local waitUntil = 0
+local replaying = false
+local frozen = false
+
+local buildingDropPositions = {}
+local DROP_POSITION_RADIUS = 30
+local DROP_POSITION_LIFETIME = 15
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "StatusUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = game:GetService("CoreGui")
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 260, 0, 80)
+mainFrame.Position = UDim2.new(0.5, -130, 0.05, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 25, 35)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 8)
+corner.Parent = mainFrame
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, -20, 0, 22)
+titleLabel.Position = UDim2.new(0, 10, 0, 8)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "🎃 自动刷糖"
+titleLabel.TextColor3 = Color3.fromRGB(255, 150, 50)
+titleLabel.TextSize = 14
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = mainFrame
+
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 20, 0, 20)
+closeBtn.Position = UDim2.new(1, -26, 0, 8)
+closeBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+closeBtn.Text = "X"
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.TextSize = 12
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.AutoButtonColor = false
+local closeCorner = Instance.new("UICorner")
+closeCorner.CornerRadius = UDim.new(0, 10)
+closeCorner.Parent = closeBtn
+closeBtn.Parent = mainFrame
+
+closeBtn.MouseButton1Click:Connect(function()
+    screenGui:Destroy()
+end)
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, -20, 0, 18)
+statusLabel.Position = UDim2.new(0, 10, 0, 34)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "初始化中..."
+statusLabel.TextColor3 = Color3.fromRGB(200, 200, 205)
+statusLabel.TextSize = 12
+statusLabel.Font = Enum.Font.GothamMedium
+statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+statusLabel.Parent = mainFrame
+
+local subLabel = Instance.new("TextLabel")
+subLabel.Size = UDim2.new(1, -20, 0, 18)
+subLabel.Position = UDim2.new(0, 10, 0, 54)
+subLabel.BackgroundTransparency = 1
+subLabel.Text = ""
+subLabel.TextColor3 = Color3.fromRGB(150, 150, 155)
+subLabel.TextSize = 11
+subLabel.Font = Enum.Font.Gotham
+subLabel.TextXAlignment = Enum.TextXAlignment.Left
+subLabel.Parent = mainFrame
+
+local function setStatus(text, subText)
+    statusLabel.Text = text
+    subLabel.Text = subText or ""
+end
+
+local function freezeCharacter()
+    if frozen then return end
+    local character = LocalPlayer.Character
+    if not character then return end
+
+    local root = character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character:FindFirstChild("Humanoid")
+
+    if root then
+        root.Anchored = true
+        root.Velocity = Vector3.new(0, 0, 0)
+        root.RotVelocity = Vector3.new(0, 0, 0)
+    end
+
+    if humanoid then
+        humanoid.PlatformStand = true
+        humanoid.WalkSpeed = 0
+        humanoid.JumpPower = 0
+    end
+
+    frozen = true
+end
+
+local function unfreezeCharacter()
+    if not frozen then return end
+    local character = LocalPlayer.Character
+    if not character then return end
+
+    local root = character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character:FindFirstChild("Humanoid")
+
+    if root then
+        root.Anchored = false
+    end
+
+    if humanoid then
+        humanoid.PlatformStand = false
+        humanoid.WalkSpeed = 16
+        humanoid.JumpPower = 50
+    end
+
+    frozen = false
+end
+
+local function isTarget(obj)
+    return TARGET_NAMES[obj.Name] and obj:IsA("Model")
+end
+
+local function refreshCache()
+    cachedTargets = {}
+    local map = Workspace:FindFirstChild("Map")
+    if not map then return end
+
+    for _, obj in ipairs(map:GetDescendants()) do
+        if isTarget(obj) then
+            table.insert(cachedTargets, obj)
+        end
+    end
+end
+
+local function getNPCs()
+    local list = {}
+    local folder = Workspace:FindFirstChild("NPCs")
+    if not folder then return list end
+
+    for _, npc in ipairs(folder:GetChildren()) do
+        if npc:IsA("Model") then
+            local humanoid = npc:FindFirstChild("Humanoid")
+            local root = npc:FindFirstChild("HumanoidRootPart") or npc:FindFirstChild("Torso")
+            if humanoid and root and humanoid.Health > 0 then
+                table.insert(list, {Model = npc, Humanoid = humanoid, Root = root})
+            end
+        end
+    end
+    return list
+end
+
+local function killNPCs()
+    local character = LocalPlayer.Character
+    if not character then return end
+    local myRoot = character:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return end
+
+    local myPos = myRoot.Position
+    local toRemove = {}
+
+    for _, npc in ipairs(getNPCs()) do
+        if #toRemove >= SETTINGS.KillNPCMaxPerTick then break end
+        local dist = (npc.Root.Position - myPos).Magnitude
+        if dist <= SETTINGS.KillNPCRange then
+            pcall(function()
+                Event:FireServer("NPCs", "Damage", npc.Humanoid, SETTINGS.KillNPCDamage)
+            end)
+            table.insert(toRemove, npc.Model)
+        end
+    end
+
+    for _, model in ipairs(toRemove) do
+        pcall(function()
+            model:Destroy()
+        end)
+    end
+end
+
+local function destroyBuildings()
+    local now = tick()
+    if now - cacheTime > SETTINGS.CacheDuration then
+        cacheTime = now
+        refreshCache()
+    end
+
+    local validTargets = {}
+    for _, obj in ipairs(cachedTargets) do
+        if obj and obj.Parent and isTarget(obj) then
+            table.insert(validTargets, obj)
+        end
+    end
+
+    if #validTargets == 0 then
+        cacheTime = 0
+        refreshCache()
+        validTargets = {}
+        for _, obj in ipairs(cachedTargets) do
+            if obj and obj.Parent and isTarget(obj) then
+                table.insert(validTargets, obj)
+            end
+        end
+    end
+
+    local toRemove = {}
+    for _, obj in ipairs(validTargets) do
+        if #toRemove >= SETTINGS.MaxBuildingsPerScan then break end
+
+        local part = obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")) or obj
+        if part then
+            table.insert(buildingDropPositions, {
+                Position = part.Position,
+                Time = now,
+            })
+        end
+
+        pcall(function()
+            Event:FireServer("DamageToOpen", "Damage", obj, SETTINGS.Damage, "bullet")
+        end)
+        table.insert(toRemove, obj)
+    end
+
+    for _, obj in ipairs(toRemove) do
+        pcall(function()
+            obj:Destroy()
+        end)
+    end
+
+    if #toRemove > 0 then
+        waitUntil = now + SETTINGS.DestroyWait
+    end
+end
+
+local function detectHeli()
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("Model") or obj:IsA("BasePart") then
+            local name = obj.Name:lower()
+            if string.find(name, "heli") or string.find(name, "police") then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+local function detectCustomsFinal()
+    local customs = Workspace:FindFirstChild("CustomsFinal", true)
+    return customs ~= nil
+end
+
+local function createBarrier()
+    if barrierActive then return end
+    barrierActive = true
+
+    local character = LocalPlayer.Character
+    if not character then
+        barrierActive = false
+        return
+    end
+
+    local myRoot = character:FindFirstChild("HumanoidRootPart")
+    if not myRoot then
+        barrierActive = false
+        return
+    end
+
+    local myPos = myRoot.Position
+    local wallCount = 32
+    local angleStep = (math.pi * 2) / wallCount
+
+    for i = 0, wallCount - 1 do
+        local angle = i * angleStep
+        local wall = Instance.new("Part")
+        wall.Name = "Barrier"
+        wall.Size = Vector3.new(SETTINGS.BarrierRadius * math.pi / wallCount + SETTINGS.WallThickness * 3, SETTINGS.BarrierHeight, SETTINGS.WallThickness)
+        wall.Anchored = true
+        wall.CanCollide = true
+        wall.Transparency = SETTINGS.BarrierTransparency
+        wall.Material = Enum.Material.ForceField
+        wall.BrickColor = BrickColor.new("Cyan")
+
+        local x = math.cos(angle) * SETTINGS.BarrierRadius
+        local z = math.sin(angle) * SETTINGS.BarrierRadius
+        wall.Position = myPos + Vector3.new(x, SETTINGS.BarrierHeight / 2, z)
+
+        local lookDir = Vector3.new(-x, 0, -z)
+        if lookDir.Magnitude > 0 then
+            wall.CFrame = CFrame.lookAt(wall.Position, wall.Position + lookDir)
+        end
+
+        wall.Parent = workspace
+        table.insert(barrierParts, wall)
+
+        local glow = Instance.new("PointLight")
+        glow.Color = Color3.fromRGB(0, 200, 255)
+        glow.Brightness = 2
+        glow.Range = 8
+        glow.Parent = wall
+
+        local emitter = Instance.new("ParticleEmitter")
+        emitter.Texture = "rbxassetid://243098098"
+        emitter.Lifetime = NumberRange.new(1, 2)
+        emitter.Rate = 50
+        emitter.Speed = NumberRange.new(0)
+        emitter.SpreadAngle = Vector2.new(360, 360)
+        emitter.Color = ColorSequence.new(Color3.fromRGB(0, 200, 255))
+        emitter.LightEmission = 1
+        emitter.Transparency = NumberSequence.new(0, 1)
+        emitter.Size = NumberSequence.new(0.2)
+        emitter.Parent = wall
+    end
+
+    local roof = Instance.new("Part")
+    roof.Name = "Barrier"
+    roof.Size = Vector3.new(SETTINGS.BarrierRadius * 2.5, SETTINGS.WallThickness, SETTINGS.BarrierRadius * 2.5)
+    roof.Anchored = true
+    roof.CanCollide = true
+    roof.Transparency = SETTINGS.BarrierTransparency
+    roof.Material = Enum.Material.ForceField
+    roof.BrickColor = BrickColor.new("Cyan")
+    roof.Position = myPos + Vector3.new(0, SETTINGS.BarrierHeight, 0)
+    roof.Parent = workspace
+    table.insert(barrierParts, roof)
+
+    local roofGlow = Instance.new("PointLight")
+    roofGlow.Color = Color3.fromRGB(0, 200, 255)
+    roofGlow.Brightness = 2
+    roofGlow.Range = 12
+    roofGlow.Parent = roof
+end
+
+local function destroyBarrier()
+    for _, part in ipairs(barrierParts) do
+        if part and part.Parent then
+            part:Destroy()
+        end
+    end
+    barrierParts = {}
+    barrierActive = false
+end
+
+local function updateBarrier()
+    local character = LocalPlayer.Character
+    if not character then return end
+
+    local myRoot = character:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return end
+
+    local myPos = myRoot.Position
+    local wallCount = 32
+    local angleStep = (math.pi * 2) / wallCount
+
+    for i = 0, wallCount - 1 do
+        local wall = barrierParts[i + 1]
+        if wall and wall.Parent then
+            local angle = i * angleStep
+            local x = math.cos(angle) * SETTINGS.BarrierRadius
+            local z = math.sin(angle) * SETTINGS.BarrierRadius
+
+            wall.Position = myPos + Vector3.new(x, SETTINGS.BarrierHeight / 2, z)
+
+            local lookDir = Vector3.new(-x, 0, -z)
+            if lookDir.Magnitude > 0 then
+                wall.CFrame = CFrame.lookAt(wall.Position, wall.Position + lookDir)
+            end
+
+            wall.BrickColor = BrickColor.new(Color3.fromHSV(hue, 1, 1))
+        end
+    end
+
+    local roof = barrierParts[wallCount + 1]
+    if roof and roof.Parent then
+        roof.Position = myPos + Vector3.new(0, SETTINGS.BarrierHeight, 0)
+        roof.BrickColor = BrickColor.new(Color3.fromHSV(hue, 1, 1))
+    end
+end
+
+local function isValidCandy(obj)
+    if not obj or not obj.Parent then return false end
+
+    local sensor = obj:FindFirstChild("TouchSensor")
+    if not sensor or not sensor:IsA("BasePart") then return false end
+    if blacklist[sensor] then return false end
+
+    local mesh = obj:FindFirstChildWhichIsA("MeshPart")
+    if mesh and mesh.Transparency >= 1 then return false end
+
+    local config = obj:FindFirstChild("Candy")
+    local value = obj:GetAttribute("CandyValue")
+    if not config and not value then return false end
+
+    return true, sensor
+end
+
+local function isBuildingDrop(sensor, now)
+    for i = #buildingDropPositions, 1, -1 do
+        local drop = buildingDropPositions[i]
+        if now - drop.Time > DROP_POSITION_LIFETIME then
+            table.remove(buildingDropPositions, i)
+        else
+            if (sensor.Position - drop.Position).Magnitude <= DROP_POSITION_RADIUS then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+local function moveForward()
+    local character = LocalPlayer.Character
+    if not character then return end
+    local myRoot = character:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return end
+
+    local now = tick()
+    if now - lastMove < SETTINGS.MoveInterval then return end
+    lastMove = now
+
+    myRoot.CFrame = myRoot.CFrame + SETTINGS.MoveDirection * SETTINGS.MoveStep
+    setStatus("🚀 前进刷新", "没有糖果，向前探索")
+end
+
+local function abandonAndReplay()
+    if replaying then return end
+    replaying = true
+
+    Event:FireServer("Passout", "Abandon")
+    task.wait(1)
+
+    for i = 1, 5 do
+        Event:FireServer("GameManager", "Replay")
+        task.wait(0.5)
+    end
+
+    lastReplay = tick()
+    replaying = false
+end
+
+local function teleportToCandy()
+    local character = LocalPlayer.Character
+    if not character then return end
+    local myRoot = character:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return end
+
+    local now = tick()
+
+    if now < waitUntil then
+        freezeCharacter()
+        setStatus("⏳ 等待糖果刷新", string.format("%.1f 秒后继续", waitUntil - now))
+        return
+    else
+        unfreezeCharacter()
+    end
+
+    local candyFolder = Workspace:FindFirstChild("Candy")
+
+    if currentSensor then
+        if not currentSensor.Parent or not currentSensor:IsDescendantOf(Workspace) then
+            currentSensor = nil
+        elseif now - currentSensorTime < SETTINGS.CandyTouchTimeout then
+            setStatus("🍬 拾取糖果", string.format("%.1f 秒后超时", SETTINGS.CandyTouchTimeout - (now - currentSensorTime)))
+            return
+        else
+            blacklist[currentSensor] = true
+            currentSensor = nil
+        end
+    end
+
+    local bestBuildingDrop = nil
+    local bestBuildingDist = math.huge
+    local bestOther = nil
+    local bestOtherDist = math.huge
+
+    if candyFolder then
+        for _, obj in ipairs(candyFolder:GetChildren()) do
+            local valid, sensor = isValidCandy(obj)
+            if valid then
+                local dist = (sensor.Position - myRoot.Position).Magnitude
+                local isDrop = isBuildingDrop(sensor, now)
+
+                if isDrop then
+                    if dist < bestBuildingDist then
+                        bestBuildingDist = dist
+                        bestBuildingDrop = sensor
+                    end
+                else
+                    if dist < bestOtherDist then
+                        bestOtherDist = dist
+                        bestOther = sensor
+                    end
+                end
+            end
+        end
+    end
+
+    local target = bestBuildingDrop or bestOther
+    local targetDist = bestBuildingDrop and bestBuildingDist or bestOtherDist
+
+    if target then
+        currentSensor = target
+        currentSensorTime = now
+        myRoot.CFrame = CFrame.new(target.Position + Vector3.new(0, 1, 0))
+        setStatus("🍬 拾取糖果", string.format("距离: %.0f", targetDist))
+    else
+        currentSensor = nil
+        moveForward()
+    end
+end
+
+refreshCache()
+
+RunService.RenderStepped:Connect(function(dt)
+    hue = (hue + dt * 0.5) % 1
+    local now = tick()
+
+    if not replaying and detectCustomsFinal() then
+        unfreezeCharacter()
+        abandonAndReplay()
+        return
+    end
+
+    killNPCs()
+    destroyBuildings()
+
+    if now - lastScan >= SETTINGS.ScanInterval then
+        lastScan = now
+        local heliExists = detectHeli()
+        if heliExists and not barrierActive then
+            createBarrier()
+        elseif not heliExists and barrierActive then
+            destroyBarrier()
+        end
+    end
+
+    if barrierActive then
+        updateBarrier()
+    end
+
+    if now - lastTeleportCandy >= SETTINGS.TeleportCandyInterval then
+        lastTeleportCandy = now
+        teleportToCandy()
+    end
+end)
