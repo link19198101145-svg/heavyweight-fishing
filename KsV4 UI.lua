@@ -21,6 +21,12 @@ local currentGrave = nil
 local chestTeleportIndex = 1
 local originalLighting = nil
 local fullBrightEnabled = false
+local npcPullEnabled = false
+local npcPullRadius = math.huge
+local npcPullFront = 5
+local npcPullInterval = 0.1
+local npcPullConnection = nil
+local lastNpcPull = 0
 
 local CHEST_POINTS = {
     Vector3.new(9312.5, 4624.0, -5172.4),
@@ -228,6 +234,60 @@ local function findNearestCandy()
     return best
 end
 
+local function pullNearbyNpcs()
+    local character = LocalPlayer.Character
+    if not character then return end
+    local myRoot = character:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return end
+
+    local npcFolder = Workspace:FindFirstChild("NPC")
+    if not npcFolder then return end
+
+    local myPos = myRoot.Position
+    local forward = myRoot.CFrame.LookVector
+    local targetPos = myPos + forward * npcPullFront
+
+    for _, group in ipairs(npcFolder:GetChildren()) do
+        if group:IsA("Folder") or group:IsA("Model") then
+            for _, npc in ipairs(group:GetChildren()) do
+                if npc:IsA("Model") then
+                    local npcRoot = npc:FindFirstChild("HumanoidRootPart") or npc:FindFirstChild("Torso") or npc:FindFirstChildWhichIsA("BasePart")
+                    if npcRoot then
+                        local dist = (npcRoot.Position - myPos).Magnitude
+                        if dist <= npcPullRadius then
+                            pcall(function()
+                                if npc.PrimaryPart then
+                                    npc:PivotTo(CFrame.new(targetPos))
+                                else
+                                    npcRoot.CFrame = CFrame.new(targetPos)
+                                end
+                            end)
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+local function startNpcPullLoop()
+    if npcPullConnection then return end
+    npcPullConnection = RunService.RenderStepped:Connect(function()
+        if not npcPullEnabled then return end
+        local now = tick()
+        if now - lastNpcPull < npcPullInterval then return end
+        lastNpcPull = now
+        pullNearbyNpcs()
+    end)
+end
+
+local function stopNpcPullLoop()
+    if npcPullConnection then
+        npcPullConnection:Disconnect()
+        npcPullConnection = nil
+    end
+end
+
 Workspace.DescendantAdded:Connect(function(obj)
     if instantInteract and obj:IsA("ProximityPrompt") then
         pcall(function()
@@ -356,6 +416,7 @@ closeBtn.Parent = mainFrame
 
 closeBtn.MouseButton1Click:Connect(function()
     disableFullBright()
+    stopNpcPullLoop()
     screenGui:Destroy()
 end)
 
@@ -559,7 +620,7 @@ chestTeleportBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-local page2, _ = createPage(200)
+local page2, _ = createPage(320)
 
 createToggle(page2, "全亮 + 除雾", 8, function(state)
     if state then enableFullBright() else disableFullBright() end
@@ -668,6 +729,123 @@ applyJumpBtn.MouseButton1Click:Connect(function()
     if not humanoid then return end
     local jump = tonumber(jumpBox.Text) or 50
     humanoid.JumpPower = jump
+end)
+
+createSubLabel(page2, "👊 NPC 抓取", 180)
+
+createToggle(page2, "抓取附近NPC", 198, function(state)
+    npcPullEnabled = state
+    if state then
+        startNpcPullLoop()
+    else
+        stopNpcPullLoop()
+    end
+end)
+
+local pullRadiusLabel = Instance.new("TextLabel")
+pullRadiusLabel.Size = UDim2.new(0, 90, 0, 24)
+pullRadiusLabel.Position = UDim2.new(0, 5, 0, 234)
+pullRadiusLabel.BackgroundTransparency = 1
+pullRadiusLabel.Text = "抓取半径:"
+pullRadiusLabel.TextColor3 = Color3.fromRGB(200, 200, 205)
+pullRadiusLabel.TextSize = 11
+pullRadiusLabel.Font = Enum.Font.GothamMedium
+pullRadiusLabel.TextXAlignment = Enum.TextXAlignment.Left
+pullRadiusLabel.Parent = page2
+
+local pullRadiusBox = Instance.new("TextBox")
+pullRadiusBox.Size = UDim2.new(0, 70, 0, 24)
+pullRadiusBox.Position = UDim2.new(0, 80, 0, 234)
+pullRadiusBox.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+pullRadiusBox.BorderSizePixel = 0
+pullRadiusBox.Text = "∞"
+pullRadiusBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+pullRadiusBox.TextSize = 11
+pullRadiusBox.Font = Enum.Font.Gotham
+pullRadiusBox.ClearTextOnFocus = false
+local pullRadiusCorner = Instance.new("UICorner")
+pullRadiusCorner.CornerRadius = UDim.new(0, 5)
+pullRadiusCorner.Parent = pullRadiusBox
+pullRadiusBox.Parent = page2
+
+local frontLabel = Instance.new("TextLabel")
+frontLabel.Size = UDim2.new(0, 70, 0, 24)
+frontLabel.Position = UDim2.new(0, 155, 0, 234)
+frontLabel.BackgroundTransparency = 1
+frontLabel.Text = "前方:"
+frontLabel.TextColor3 = Color3.fromRGB(200, 200, 205)
+frontLabel.TextSize = 11
+frontLabel.Font = Enum.Font.GothamMedium
+frontLabel.TextXAlignment = Enum.TextXAlignment.Left
+frontLabel.Parent = page2
+
+local frontBox = Instance.new("TextBox")
+frontBox.Size = UDim2.new(0, 50, 0, 24)
+frontBox.Position = UDim2.new(0, 200, 0, 234)
+frontBox.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+frontBox.BorderSizePixel = 0
+frontBox.Text = "5"
+frontBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+frontBox.TextSize = 11
+frontBox.Font = Enum.Font.Gotham
+frontBox.ClearTextOnFocus = false
+local frontBoxCorner = Instance.new("UICorner")
+frontBoxCorner.CornerRadius = UDim.new(0, 5)
+frontBoxCorner.Parent = frontBox
+frontBox.Parent = page2
+
+local intervalLabel2 = Instance.new("TextLabel")
+intervalLabel2.Size = UDim2.new(0, 90, 0, 24)
+intervalLabel2.Position = UDim2.new(0, 5, 0, 264)
+intervalLabel2.BackgroundTransparency = 1
+intervalLabel2.Text = "抓取间隔:"
+intervalLabel2.TextColor3 = Color3.fromRGB(200, 200, 205)
+intervalLabel2.TextSize = 11
+intervalLabel2.Font = Enum.Font.GothamMedium
+intervalLabel2.TextXAlignment = Enum.TextXAlignment.Left
+intervalLabel2.Parent = page2
+
+local intervalBox2 = Instance.new("TextBox")
+intervalBox2.Size = UDim2.new(0, 70, 0, 24)
+intervalBox2.Position = UDim2.new(0, 80, 0, 264)
+intervalBox2.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+intervalBox2.BorderSizePixel = 0
+intervalBox2.Text = "0.1"
+intervalBox2.TextColor3 = Color3.fromRGB(255, 255, 255)
+intervalBox2.TextSize = 11
+intervalBox2.Font = Enum.Font.Gotham
+intervalBox2.ClearTextOnFocus = false
+local intervalBox2Corner = Instance.new("UICorner")
+intervalBox2Corner.CornerRadius = UDim.new(0, 5)
+intervalBox2Corner.Parent = intervalBox2
+intervalBox2.Parent = page2
+
+local applyPullBtn = Instance.new("TextButton")
+applyPullBtn.Size = UDim2.new(0, 60, 0, 24)
+applyPullBtn.Position = UDim2.new(0, 235, 0, 264)
+applyPullBtn.BackgroundColor3 = Color3.fromRGB(60, 130, 255)
+applyPullBtn.Text = "应用"
+applyPullBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+applyPullBtn.TextSize = 10
+applyPullBtn.Font = Enum.Font.GothamBold
+applyPullBtn.AutoButtonColor = false
+local applyPullCorner = Instance.new("UICorner")
+applyPullCorner.CornerRadius = UDim.new(0, 5)
+applyPullCorner.Parent = applyPullBtn
+applyPullBtn.Parent = page2
+
+applyPullBtn.MouseButton1Click:Connect(function()
+    local r = tonumber(pullRadiusBox.Text)
+    if r and r > 0 then
+        npcPullRadius = r
+    else
+        npcPullRadius = math.huge
+    end
+    npcPullFront = math.clamp(tonumber(frontBox.Text) or 5, 1, 100)
+    npcPullInterval = math.clamp(tonumber(intervalBox2.Text) or 0.1, 0.01, 10)
+    pullRadiusBox.Text = npcPullRadius == math.huge and "∞" or tostring(npcPullRadius)
+    frontBox.Text = tostring(npcPullFront)
+    intervalBox2.Text = tostring(npcPullInterval)
 end)
 
 local page3, _ = createPage(280)
