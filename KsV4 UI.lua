@@ -27,6 +27,23 @@ local npcPullFront = 5
 local npcPullInterval = 0.1
 local npcPullConnection = nil
 local lastNpcPull = 0
+local npcInitDone = false
+local npcInitRunning = false
+local npcInitIndex = 1
+local lastNpcInitTeleport = 0
+local lastCandyUse = 0
+
+local NPC_INIT_POINTS = {
+    Vector3.new(6121, 4237, -2985),
+    Vector3.new(7293, 5660, -1939),
+    Vector3.new(11175, 4636, -6352),
+    Vector3.new(12044, 4631, -4397),
+    Vector3.new(10007, 4621, -4750),
+    Vector3.new(10765, 3826, -6070),
+    Vector3.new(8504, 4625, -4897),
+    Vector3.new(9274, 4629, -4996),
+    Vector3.new(9055, 4631, -5744),
+}
 
 local CHEST_POINTS = {
     Vector3.new(9312.5, 4624.0, -5172.4),
@@ -109,6 +126,36 @@ local function firePrompt(prompt)
             prompt:InputHoldEnd()
         end
     end)
+end
+
+local function EquipAllItems()
+    local character = LocalPlayer.Character
+    if not character then return end
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    if not backpack then return end
+
+    for _, item in ipairs(backpack:GetChildren()) do
+        if item:IsA("Tool") then
+            pcall(function()
+                item.Parent = character
+            end)
+        end
+    end
+end
+
+local function useAllCandies()
+    local character = LocalPlayer.Character
+    if not character then return end
+    local humanoid = character:FindFirstChild("Humanoid")
+    if not humanoid then return end
+
+    for _, item in ipairs(character:GetChildren()) do
+        if item:IsA("Tool") and item.Name == "Candy" then
+            pcall(function()
+                item:Activate()
+            end)
+        end
+    end
 end
 
 local function enableFullBright()
@@ -251,8 +298,9 @@ local function pullNearbyNpcs()
         if group:IsA("Folder") or group:IsA("Model") then
             for _, npc in ipairs(group:GetChildren()) do
                 if npc:IsA("Model") then
+                    local humanoid = npc:FindFirstChild("Humanoid")
                     local npcRoot = npc:FindFirstChild("HumanoidRootPart") or npc:FindFirstChild("Torso") or npc:FindFirstChildWhichIsA("BasePart")
-                    if npcRoot then
+                    if npcRoot and humanoid and humanoid.Health > 0 then
                         local dist = (npcRoot.Position - myPos).Magnitude
                         if dist <= npcPullRadius then
                             pcall(function()
@@ -270,6 +318,26 @@ local function pullNearbyNpcs()
     end
 end
 
+local function cleanRagdolls()
+    local npcFolder = Workspace:FindFirstChild("NPC")
+    if not npcFolder then return end
+
+    for _, group in ipairs(npcFolder:GetChildren()) do
+        if group:IsA("Folder") or group:IsA("Model") then
+            for _, npc in ipairs(group:GetChildren()) do
+                if npc:IsA("Model") then
+                    local humanoid = npc:FindFirstChild("Humanoid")
+                    if humanoid and humanoid.Health <= 0 then
+                        pcall(function()
+                            npc:Destroy()
+                        end)
+                    end
+                end
+            end
+        end
+    end
+end
+
 local function startNpcPullLoop()
     if npcPullConnection then return end
     npcPullConnection = RunService.RenderStepped:Connect(function()
@@ -278,6 +346,7 @@ local function startNpcPullLoop()
         if now - lastNpcPull < npcPullInterval then return end
         lastNpcPull = now
         pullNearbyNpcs()
+        cleanRagdolls()
     end)
 end
 
@@ -303,6 +372,28 @@ RunService.RenderStepped:Connect(function()
     if not character then return end
     local myRoot = character:FindFirstChild("HumanoidRootPart")
     if not myRoot then return end
+
+    if npcInitRunning then
+        if now - lastNpcInitTeleport >= 0.25 then
+            lastNpcInitTeleport = now
+
+            if npcInitIndex > #NPC_INIT_POINTS then
+                npcInitDone = true
+                npcInitRunning = false
+                npcInitIndex = 1
+                if npcInitBtn then
+                    npcInitBtn.Text = "✅ NPC已加载"
+                    npcInitBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+                end
+                return
+            end
+
+            local target = NPC_INIT_POINTS[npcInitIndex]
+            myRoot.CFrame = CFrame.new(target + Vector3.new(0, 5, 0))
+            npcInitIndex = npcInitIndex + 1
+        end
+        return
+    end
 
     if initRunning then
         if now - lastInitTeleport >= 0.25 then
@@ -331,6 +422,13 @@ RunService.RenderStepped:Connect(function()
     end
 
     if candyAutoMode then
+        EquipAllItems()
+
+        if now - lastCandyUse >= 0.3 then
+            lastCandyUse = now
+            useAllCandies()
+        end
+
         if now - lastCandyTeleport >= 0.3 then
             lastCandyTeleport = now
             local candy = findNearestCandy()
@@ -346,6 +444,8 @@ RunService.RenderStepped:Connect(function()
     end
 
     if graveMode then
+        EquipAllItems()
+
         if not currentGrave then
             currentGrave = getFirstGrave()
         end
@@ -555,7 +655,7 @@ local initBtn = Instance.new("TextButton")
 initBtn.Size = UDim2.new(0, 290, 0, 30)
 initBtn.Position = UDim2.new(0, 5, 0, 5)
 initBtn.BackgroundColor3 = Color3.fromRGB(255, 170, 40)
-initBtn.Text = "🔄 初始化地图 (糖果+宝箱)"
+initBtn.Text = "🔄 初始化糖果和宝箱"
 initBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 initBtn.TextSize = 11
 initBtn.Font = Enum.Font.GothamBold
@@ -620,7 +720,7 @@ chestTeleportBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-local page2, _ = createPage(320)
+local page2, _ = createPage(360)
 
 createToggle(page2, "全亮 + 除雾", 8, function(state)
     if state then enableFullBright() else disableFullBright() end
@@ -733,7 +833,33 @@ end)
 
 createSubLabel(page2, "👊 NPC 抓取", 180)
 
-createToggle(page2, "抓取附近NPC", 198, function(state)
+local npcInitBtn = Instance.new("TextButton")
+npcInitBtn.Size = UDim2.new(0, 290, 0, 28)
+npcInitBtn.Position = UDim2.new(0, 5, 0, 198)
+npcInitBtn.BackgroundColor3 = Color3.fromRGB(255, 170, 40)
+npcInitBtn.Text = "🔄 初始化NPC"
+npcInitBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+npcInitBtn.TextSize = 11
+npcInitBtn.Font = Enum.Font.GothamBold
+npcInitBtn.AutoButtonColor = false
+local npcInitBtnCorner = Instance.new("UICorner")
+npcInitBtnCorner.CornerRadius = UDim.new(0, 6)
+npcInitBtnCorner.Parent = npcInitBtn
+npcInitBtn.Parent = page2
+
+npcInitBtn.MouseButton1Click:Connect(function()
+    if npcInitDone then
+        npcInitBtn.Text = "✅ NPC已加载"
+        return
+    end
+    npcInitRunning = true
+    npcInitIndex = 1
+    lastNpcInitTeleport = 0
+    npcInitBtn.Text = "⏳ NPC加载中..."
+    npcInitBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+end)
+
+createToggle(page2, "抓取附近NPC", 234, function(state)
     npcPullEnabled = state
     if state then
         startNpcPullLoop()
@@ -744,7 +870,7 @@ end)
 
 local pullRadiusLabel = Instance.new("TextLabel")
 pullRadiusLabel.Size = UDim2.new(0, 90, 0, 24)
-pullRadiusLabel.Position = UDim2.new(0, 5, 0, 234)
+pullRadiusLabel.Position = UDim2.new(0, 5, 0, 270)
 pullRadiusLabel.BackgroundTransparency = 1
 pullRadiusLabel.Text = "抓取半径:"
 pullRadiusLabel.TextColor3 = Color3.fromRGB(200, 200, 205)
@@ -755,7 +881,7 @@ pullRadiusLabel.Parent = page2
 
 local pullRadiusBox = Instance.new("TextBox")
 pullRadiusBox.Size = UDim2.new(0, 70, 0, 24)
-pullRadiusBox.Position = UDim2.new(0, 80, 0, 234)
+pullRadiusBox.Position = UDim2.new(0, 80, 0, 270)
 pullRadiusBox.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 pullRadiusBox.BorderSizePixel = 0
 pullRadiusBox.Text = "∞"
@@ -770,7 +896,7 @@ pullRadiusBox.Parent = page2
 
 local frontLabel = Instance.new("TextLabel")
 frontLabel.Size = UDim2.new(0, 70, 0, 24)
-frontLabel.Position = UDim2.new(0, 155, 0, 234)
+frontLabel.Position = UDim2.new(0, 155, 0, 270)
 frontLabel.BackgroundTransparency = 1
 frontLabel.Text = "前方:"
 frontLabel.TextColor3 = Color3.fromRGB(200, 200, 205)
@@ -781,7 +907,7 @@ frontLabel.Parent = page2
 
 local frontBox = Instance.new("TextBox")
 frontBox.Size = UDim2.new(0, 50, 0, 24)
-frontBox.Position = UDim2.new(0, 200, 0, 234)
+frontBox.Position = UDim2.new(0, 200, 0, 270)
 frontBox.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 frontBox.BorderSizePixel = 0
 frontBox.Text = "5"
@@ -796,7 +922,7 @@ frontBox.Parent = page2
 
 local intervalLabel2 = Instance.new("TextLabel")
 intervalLabel2.Size = UDim2.new(0, 90, 0, 24)
-intervalLabel2.Position = UDim2.new(0, 5, 0, 264)
+intervalLabel2.Position = UDim2.new(0, 5, 0, 300)
 intervalLabel2.BackgroundTransparency = 1
 intervalLabel2.Text = "抓取间隔:"
 intervalLabel2.TextColor3 = Color3.fromRGB(200, 200, 205)
@@ -807,7 +933,7 @@ intervalLabel2.Parent = page2
 
 local intervalBox2 = Instance.new("TextBox")
 intervalBox2.Size = UDim2.new(0, 70, 0, 24)
-intervalBox2.Position = UDim2.new(0, 80, 0, 264)
+intervalBox2.Position = UDim2.new(0, 80, 0, 300)
 intervalBox2.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 intervalBox2.BorderSizePixel = 0
 intervalBox2.Text = "0.1"
@@ -822,7 +948,7 @@ intervalBox2.Parent = page2
 
 local applyPullBtn = Instance.new("TextButton")
 applyPullBtn.Size = UDim2.new(0, 60, 0, 24)
-applyPullBtn.Position = UDim2.new(0, 235, 0, 264)
+applyPullBtn.Position = UDim2.new(0, 235, 0, 300)
 applyPullBtn.BackgroundColor3 = Color3.fromRGB(60, 130, 255)
 applyPullBtn.Text = "应用"
 applyPullBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
