@@ -2,12 +2,14 @@ local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
+local GuiService = game:GetService("GuiService")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 
 local instantInteract = false
 local graveMode = false
 local candyAutoMode = false
+local removeLoadingPopup = false
 local remoteScriptRunning = false
 local remoteScriptThread = nil
 local initDone = false
@@ -146,8 +148,6 @@ end
 local function useAllCandies()
     local character = LocalPlayer.Character
     if not character then return end
-    local humanoid = character:FindFirstChild("Humanoid")
-    if not humanoid then return end
 
     for _, item in ipairs(character:GetChildren()) do
         if item:IsA("Tool") and item.Name == "Candy" then
@@ -214,6 +214,14 @@ local function setPromptInstant()
             end)
         end
     end
+end
+
+local function disableLoadingPopup()
+    pcall(function()
+        if GuiService.SetGameplayPausedNotificationEnabled then
+            GuiService:SetGameplayPausedNotificationEnabled(false)
+        end
+    end)
 end
 
 local function getFirstGrave()
@@ -720,7 +728,7 @@ chestTeleportBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-local page2, _ = createPage(360)
+local page2, _ = createPage(400)
 
 createToggle(page2, "全亮 + 除雾", 8, function(state)
     if state then enableFullBright() else disableFullBright() end
@@ -731,11 +739,18 @@ createToggle(page2, "快速交互", 50, function(state)
     if state then setPromptInstant() end
 end)
 
-createSubLabel(page2, "🏃 移动设置", 94)
+createToggle(page2, "移除加载弹窗", 92, function(state)
+    removeLoadingPopup = state
+    if state then
+        disableLoadingPopup()
+    end
+end)
+
+createSubLabel(page2, "🏃 移动设置", 136)
 
 local speedLabel = Instance.new("TextLabel")
 speedLabel.Size = UDim2.new(0, 90, 0, 24)
-speedLabel.Position = UDim2.new(0, 5, 0, 112)
+speedLabel.Position = UDim2.new(0, 5, 0, 154)
 speedLabel.BackgroundTransparency = 1
 speedLabel.Text = "移速:"
 speedLabel.TextColor3 = Color3.fromRGB(200, 200, 205)
@@ -746,7 +761,7 @@ speedLabel.Parent = page2
 
 local speedBox = Instance.new("TextBox")
 speedBox.Size = UDim2.new(0, 80, 0, 24)
-speedBox.Position = UDim2.new(0, 60, 0, 112)
+speedBox.Position = UDim2.new(0, 60, 0, 154)
 speedBox.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 speedBox.BorderSizePixel = 0
 speedBox.Text = "16"
@@ -761,7 +776,7 @@ speedBox.Parent = page2
 
 local applySpeedBtn = Instance.new("TextButton")
 applySpeedBtn.Size = UDim2.new(0, 60, 0, 24)
-applySpeedBtn.Position = UDim2.new(0, 150, 0, 112)
+applySpeedBtn.Position = UDim2.new(0, 150, 0, 154)
 applySpeedBtn.BackgroundColor3 = Color3.fromRGB(60, 130, 255)
 applySpeedBtn.Text = "应用"
 applySpeedBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -784,7 +799,7 @@ end)
 
 local jumpLabel = Instance.new("TextLabel")
 jumpLabel.Size = UDim2.new(0, 90, 0, 24)
-jumpLabel.Position = UDim2.new(0, 5, 0, 144)
+jumpLabel.Position = UDim2.new(0, 5, 0, 186)
 jumpLabel.BackgroundTransparency = 1
 jumpLabel.Text = "跳跃力:"
 jumpLabel.TextColor3 = Color3.fromRGB(200, 200, 205)
@@ -795,7 +810,7 @@ jumpLabel.Parent = page2
 
 local jumpBox = Instance.new("TextBox")
 jumpBox.Size = UDim2.new(0, 80, 0, 24)
-jumpBox.Position = UDim2.new(0, 60, 0, 144)
+jumpBox.Position = UDim2.new(0, 60, 0, 186)
 jumpBox.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 jumpBox.BorderSizePixel = 0
 jumpBox.Text = "50"
@@ -810,7 +825,7 @@ jumpBox.Parent = page2
 
 local applyJumpBtn = Instance.new("TextButton")
 applyJumpBtn.Size = UDim2.new(0, 60, 0, 24)
-applyJumpBtn.Position = UDim2.new(0, 150, 0, 144)
+applyJumpBtn.Position = UDim2.new(0, 150, 0, 186)
 applyJumpBtn.BackgroundColor3 = Color3.fromRGB(60, 130, 255)
 applyJumpBtn.Text = "应用"
 applyJumpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -831,11 +846,11 @@ applyJumpBtn.MouseButton1Click:Connect(function()
     humanoid.JumpPower = jump
 end)
 
-createSubLabel(page2, "👊 NPC 抓取", 180)
+createSubLabel(page2, "👊 NPC 抓取", 222)
 
 local npcInitBtn = Instance.new("TextButton")
 npcInitBtn.Size = UDim2.new(0, 290, 0, 28)
-npcInitBtn.Position = UDim2.new(0, 5, 0, 198)
+npcInitBtn.Position = UDim2.new(0, 5, 0, 240)
 npcInitBtn.BackgroundColor3 = Color3.fromRGB(255, 170, 40)
 npcInitBtn.Text = "🔄 初始化NPC"
 npcInitBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -859,7 +874,7 @@ npcInitBtn.MouseButton1Click:Connect(function()
     npcInitBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
 end)
 
-createToggle(page2, "抓取附近NPC", 234, function(state)
+createToggle(page2, "抓取附近NPC", 276, function(state)
     npcPullEnabled = state
     if state then
         startNpcPullLoop()
@@ -870,7 +885,7 @@ end)
 
 local pullRadiusLabel = Instance.new("TextLabel")
 pullRadiusLabel.Size = UDim2.new(0, 90, 0, 24)
-pullRadiusLabel.Position = UDim2.new(0, 5, 0, 270)
+pullRadiusLabel.Position = UDim2.new(0, 5, 0, 312)
 pullRadiusLabel.BackgroundTransparency = 1
 pullRadiusLabel.Text = "抓取半径:"
 pullRadiusLabel.TextColor3 = Color3.fromRGB(200, 200, 205)
@@ -881,7 +896,7 @@ pullRadiusLabel.Parent = page2
 
 local pullRadiusBox = Instance.new("TextBox")
 pullRadiusBox.Size = UDim2.new(0, 70, 0, 24)
-pullRadiusBox.Position = UDim2.new(0, 80, 0, 270)
+pullRadiusBox.Position = UDim2.new(0, 80, 0, 312)
 pullRadiusBox.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 pullRadiusBox.BorderSizePixel = 0
 pullRadiusBox.Text = "∞"
@@ -896,7 +911,7 @@ pullRadiusBox.Parent = page2
 
 local frontLabel = Instance.new("TextLabel")
 frontLabel.Size = UDim2.new(0, 70, 0, 24)
-frontLabel.Position = UDim2.new(0, 155, 0, 270)
+frontLabel.Position = UDim2.new(0, 155, 0, 312)
 frontLabel.BackgroundTransparency = 1
 frontLabel.Text = "前方:"
 frontLabel.TextColor3 = Color3.fromRGB(200, 200, 205)
@@ -907,7 +922,7 @@ frontLabel.Parent = page2
 
 local frontBox = Instance.new("TextBox")
 frontBox.Size = UDim2.new(0, 50, 0, 24)
-frontBox.Position = UDim2.new(0, 200, 0, 270)
+frontBox.Position = UDim2.new(0, 200, 0, 312)
 frontBox.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 frontBox.BorderSizePixel = 0
 frontBox.Text = "5"
@@ -922,7 +937,7 @@ frontBox.Parent = page2
 
 local intervalLabel2 = Instance.new("TextLabel")
 intervalLabel2.Size = UDim2.new(0, 90, 0, 24)
-intervalLabel2.Position = UDim2.new(0, 5, 0, 300)
+intervalLabel2.Position = UDim2.new(0, 5, 0, 342)
 intervalLabel2.BackgroundTransparency = 1
 intervalLabel2.Text = "抓取间隔:"
 intervalLabel2.TextColor3 = Color3.fromRGB(200, 200, 205)
@@ -933,7 +948,7 @@ intervalLabel2.Parent = page2
 
 local intervalBox2 = Instance.new("TextBox")
 intervalBox2.Size = UDim2.new(0, 70, 0, 24)
-intervalBox2.Position = UDim2.new(0, 80, 0, 300)
+intervalBox2.Position = UDim2.new(0, 80, 0, 342)
 intervalBox2.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 intervalBox2.BorderSizePixel = 0
 intervalBox2.Text = "0.1"
@@ -948,7 +963,7 @@ intervalBox2.Parent = page2
 
 local applyPullBtn = Instance.new("TextButton")
 applyPullBtn.Size = UDim2.new(0, 60, 0, 24)
-applyPullBtn.Position = UDim2.new(0, 235, 0, 300)
+applyPullBtn.Position = UDim2.new(0, 235, 0, 342)
 applyPullBtn.BackgroundColor3 = Color3.fromRGB(60, 130, 255)
 applyPullBtn.Text = "应用"
 applyPullBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
