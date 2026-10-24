@@ -485,9 +485,9 @@ local function findPunchButton()
     return nil
 end
 
-local function clickAtLeft()
+local function clickAtRight()
     local vp = Workspace.CurrentCamera.ViewportSize
-    local pos = Vector2.new(vp.X * 0.12, vp.Y * 0.5)
+    local pos = Vector2.new(vp.X * 0.88, vp.Y * 0.5)
     pcall(function()
         local vim = game:GetService("VirtualInputManager")
         vim:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 0)
@@ -507,7 +507,7 @@ local function startMainClickLoop()
             if btn and btn.Enabled then
                 pcall(function() btn:Activate() end)
             else
-                clickAtLeft()
+                clickAtRight()
             end
             task.wait(0.1)
         end
