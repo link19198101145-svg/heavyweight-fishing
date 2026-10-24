@@ -4,6 +4,7 @@ local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
 local GuiService = game:GetService("GuiService")
 local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 local LocalPlayer = Players.LocalPlayer
 
 local instantInteract = false
@@ -19,6 +20,7 @@ local lastInitTeleport = 0
 local lastTeleport = 0
 local lastPrompt = 0
 local lastCandyTeleport = 0
+local lastScreenClick = 0
 local currentGrave = nil
 local chestTeleportIndex = 1
 local originalLighting = nil
@@ -33,7 +35,6 @@ local npcInitDone = false
 local npcInitRunning = false
 local npcInitIndex = 1
 local lastNpcInitTeleport = 0
-local lastCandyUse = 0
 
 local NPC_INIT_POINTS = {
     Vector3.new(6121, 4237, -2985),
@@ -128,6 +129,17 @@ local function firePrompt(prompt)
             prompt:InputHoldEnd()
         end
     end)
+end
+
+local function clickScreenCenter()
+    local camera = Workspace.CurrentCamera
+    if not camera then return end
+    local viewport = camera.ViewportSize
+    local centerX = viewport.X / 2
+    local centerY = viewport.Y / 2
+    VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 0)
+    task.wait(0.01)
+    VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 0)
 end
 
 local function EquipAllItems()
@@ -431,10 +443,11 @@ RunService.RenderStepped:Connect(function()
 
     if candyAutoMode then
         EquipAllItems()
+        useAllCandies()
 
-        if now - lastCandyUse >= 0.3 then
-            lastCandyUse = now
-            useAllCandies()
+        if now - lastScreenClick >= 0.1 then
+            lastScreenClick = now
+            task.spawn(clickScreenCenter)
         end
 
         if now - lastCandyTeleport >= 0.3 then
