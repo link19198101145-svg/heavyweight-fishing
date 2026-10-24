@@ -6,6 +6,8 @@ local LocalPlayer = Players.LocalPlayer
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
 
 local Theme = {
     Background     = Color3.fromRGB(20, 20, 24),
@@ -32,6 +34,34 @@ screenGui.IgnoreGuiInset = true
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.DisplayOrder = 999
 screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local SAVE_FILE = "AutoSugar_TargetName.txt"
+local FRIEND_FILE = "AutoSugar_FriendName.txt"
+local STATE_FILE = "AutoSugar_SwitchState.txt"
+local QUEUE_SCRIPT_URL = "https://raw.githubusercontent.com/link19198101145-svg/heavyweight-fishing/main/能力战争万圣节刷糖.lua"
+
+local function saveToFile(path, content)
+    pcall(function()
+        if writefile then writefile(path, content or "") end
+    end)
+end
+
+local function loadFromFile(path)
+    local ok, content = pcall(function()
+        if isfile and isfile(path) and readfile then
+            return readfile(path)
+        end
+        return ""
+    end)
+    return ok and content or ""
+end
+
+local function saveTargetName(name) saveToFile(SAVE_FILE, name) end
+local function loadTargetName() return loadFromFile(SAVE_FILE) end
+local function saveFriendName(name) saveToFile(FRIEND_FILE, name) end
+local function loadFriendName() return loadFromFile(FRIEND_FILE) end
+local function saveSwitchState(data) saveToFile(STATE_FILE, data) end
+local function loadSwitchState() return loadFromFile(STATE_FILE) end
 
 local function showPopup(text)
     local popup = Instance.new("Frame")
@@ -72,17 +102,15 @@ local function showPopup(text)
     Instance.new("UICorner", okBtn).CornerRadius = UDim.new(0, 6)
     okBtn.Parent = popup
 
-    okBtn.MouseButton1Click:Connect(function()
-        popup:Destroy()
-    end)
+    okBtn.MouseButton1Click:Connect(function() popup:Destroy() end)
     task.delay(3, function()
         if popup and popup.Parent then popup:Destroy() end
     end)
 end
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 350, 0, 310)
-mainFrame.Position = UDim2.new(0.5, -175, 0.5, -155)
+mainFrame.Size = UDim2.new(0, 350, 0, 350)
+mainFrame.Position = UDim2.new(0.5, -175, 0.5, -175)
 mainFrame.BackgroundColor3 = Theme.Background
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = screenGui
@@ -271,7 +299,7 @@ local function createPage(name)
     scroll.BorderSizePixel = 0
     scroll.ScrollBarThickness = 3
     scroll.ScrollBarImageColor3 = Theme.Text
-    scroll.CanvasSize = UDim2.new(0, 0, 0, 400)
+    scroll.CanvasSize = UDim2.new(0, 0, 0, 440)
     scroll.ZIndex = 1
     scroll.Parent = page
 
@@ -317,6 +345,47 @@ local function createToggleRow(label, defaultState, yPos, parent)
     return btn, lbl
 end
 
+local function createInputRow(labelText, placeholder, defaultText, yPos, parent)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(0, 276, 0, 32)
+    row.Position = UDim2.new(0, 10, 0, yPos)
+    row.BackgroundColor3 = Theme.Row
+    row.BackgroundTransparency = 0.3
+    row.BorderSizePixel = 0
+    row.ZIndex = 2
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
+    row.Parent = parent
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(0, 90, 1, 0)
+    lbl.Position = UDim2.new(0, 12, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = labelText
+    lbl.TextColor3 = Theme.Text
+    lbl.TextSize = 11
+    lbl.Font = Enum.Font.GothamMedium
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.ZIndex = 3
+    lbl.Parent = row
+
+    local box = Instance.new("TextBox")
+    box.Size = UDim2.new(0, 160, 0, 22)
+    box.Position = UDim2.new(1, -170, 0.5, -11)
+    box.BackgroundColor3 = Theme.Control
+    box.BorderSizePixel = 0
+    box.Text = defaultText or ""
+    box.PlaceholderText = placeholder
+    box.PlaceholderColor3 = Theme.TextDim
+    box.TextColor3 = Theme.Text
+    box.TextSize = 11
+    box.Font = Enum.Font.GothamMedium
+    box.ClearTextOnFocus = false
+    box.ZIndex = 3
+    Instance.new("UICorner", box).CornerRadius = UDim.new(0, 6)
+    box.Parent = row
+    return box, row
+end
+
 local function switchPage(name)
     for pName, p in pairs(pages) do
         p.frame.Visible = (pName == name)
@@ -345,12 +414,15 @@ local STAND_POS = Vector3.new(10023, PLATFORM_TOP + 3, 10023)
 local State = {
     MainAccount = false,
     SubAccount = false,
+    AutoSwitch = false,
     SubTargetName = "",
+    FriendName = "",
     usedThisLife = false,
     characterConn = nil,
     mainClickThread = nil,
     subFollowThread = nil,
     freezeThread = nil,
+    switchThread = nil,
 }
 
 local function ensurePlatform()
@@ -508,23 +580,27 @@ local function findPlayerByName(name)
     return nil
 end
 
-local function getTargetRightArmCFrame(targetChar)
+local ARM_FORWARD_OFFSET = 1.2
+
+local function getTargetRightArmFrontCFrame(targetChar)
     if not targetChar then return nil end
+    local arm
     local rightHand = targetChar:FindFirstChild("RightHand")
-    if rightHand and rightHand:IsA("BasePart") then
-        return rightHand.CFrame
+    if rightHand and rightHand:IsA("BasePart") then arm = rightHand end
+    if not arm then
+        local rightLowerArm = targetChar:FindFirstChild("RightLowerArm")
+        if rightLowerArm and rightLowerArm:IsA("BasePart") then arm = rightLowerArm end
     end
-    local rightLowerArm = targetChar:FindFirstChild("RightLowerArm")
-    if rightLowerArm and rightLowerArm:IsA("BasePart") then
-        return rightLowerArm.CFrame
+    if not arm then
+        local rightArm = targetChar:FindFirstChild("Right Arm")
+        if rightArm and rightArm:IsA("BasePart") then arm = rightArm end
     end
-    local rightArm = targetChar:FindFirstChild("Right Arm")
-    if rightArm and rightArm:IsA("BasePart") then
-        return rightArm.CFrame
+    if arm then
+        return arm.CFrame * CFrame.new(0, 0, -ARM_FORWARD_OFFSET)
     end
     local hrp = targetChar:FindFirstChild("HumanoidRootPart")
     if hrp then
-        return hrp.CFrame * CFrame.new(1.5, 0, 0)
+        return hrp.CFrame * CFrame.new(1.5, 0, -ARM_FORWARD_OFFSET)
     end
     return nil
 end
@@ -542,11 +618,9 @@ local function startSubFollowLoop()
             local tChar = target and target.Character
 
             if myHrp and tChar then
-                local armCF = getTargetRightArmCFrame(tChar)
-                if armCF then
-                    pcall(function()
-                        myHrp.CFrame = armCF
-                    end)
+                local cf = getTargetRightArmFrontCFrame(tChar)
+                if cf then
+                    pcall(function() myHrp.CFrame = cf end)
                 end
             end
             RunService.Heartbeat:Wait()
@@ -560,6 +634,198 @@ local function stopSubFollowLoop()
         State.subFollowThread = nil
     end
 end
+
+-- ===== 换服 / 加入好友核心逻辑 =====
+local function queueScriptOnTeleport()
+    local src = nil
+    local ok, raw = pcall(function()
+        return game:HttpGet(QUEUE_SCRIPT_URL, true)
+    end)
+    if ok and raw and raw ~= "" then src = raw end
+
+    if not src then
+        pcall(function()
+            if getscriptbytecode then src = getscriptbytecode() end
+        end)
+    end
+    if not src or src == "" then return false end
+
+    local okQueue = pcall(function()
+        if queue_on_teleport then
+            queue_on_teleport(src)
+        elseif syn and syn.queue_on_teleport then
+            syn.queue_on_teleport(src)
+        elseif fluxus and fluxus.queue_on_teleport then
+            fluxus.queue_on_teleport(src)
+        end
+    end)
+    return okQueue
+end
+
+local function getOtherServerId()
+    local placeId = game.PlaceId
+    local jobId = tostring(game.JobId)
+    local url = "https://games.roblox.com/v1/games/" .. placeId
+        .. "/servers/Public?sortOrder=Desc&limit=100&excludeFullGames=true"
+
+    local ok, raw = pcall(function() return game:HttpGet(url, true) end)
+    if not ok or not raw or raw == "" then return nil end
+
+    local okDecode, body = pcall(function()
+        if JSONDecode then return JSONDecode(raw) end
+        return HttpService:JSONDecode(raw)
+    end)
+    if not okDecode or type(body) ~= "table" or type(body.data) ~= "table" then
+        return nil
+    end
+
+    local candidates = {}
+    for _, v in ipairs(body.data) do
+        if type(v) == "table" and v.id and v.id ~= jobId then
+            local playing = tonumber(v.playing)
+            local maxP = tonumber(v.maxPlayers)
+            if playing and maxP and playing < maxP then
+                table.insert(candidates, v.id)
+            end
+        end
+    end
+    if #candidates == 0 then return nil end
+    return candidates[math.random(1, #candidates)]
+end
+
+local function saveStateForTeleport()
+    local data = table.concat({
+        State.MainAccount and "1" or "0",
+        State.SubAccount and "1" or "0",
+        State.AutoSwitch and "1" or "0",
+        tostring(State.SubTargetName or "")
+    }, "|")
+    saveSwitchState(data)
+end
+
+local function switchToRandomServer()
+    local targetId = getOtherServerId()
+    if not targetId then
+        showPopup("未找到其他可用服务器，请稍后重试")
+        return false
+    end
+    saveStateForTeleport()
+    queueScriptOnTeleport()
+    local ok = pcall(function()
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, targetId, LocalPlayer)
+    end)
+    if not ok then
+        showPopup("传送失败，请稍后重试")
+        return false
+    end
+    return true
+end
+
+-- 通过用户名查 UserId
+local function getUserIdByName(name)
+    local url = "https://users.roblox.com/v1/usernames/users"
+    local body = HttpService:JSONEncode({
+        usernames = { name },
+        excludeBannedUsers = true
+    })
+    local ok, raw = pcall(function()
+        if game.HttpPost then
+            return game:HttpPost(url, body, "Application/json")
+        elseif request then
+            local res = request({
+                Url = url,
+                Method = "POST",
+                Headers = { ["Content-Type"] = "application/json" },
+                Body = body
+            })
+            return res and res.Body or nil
+        end
+        return nil
+    end)
+    if not ok or not raw or raw == "" then return nil end
+    local okDecode, data = pcall(function()
+        if JSONDecode then return JSONDecode(raw) end
+        return HttpService:JSONDecode(raw)
+    end)
+    if not okDecode or type(data) ~= "table" or type(data.data) ~= "table" then
+        return nil
+    end
+    if data.data[1] and data.data[1].id then
+        return data.data[1].id
+    end
+    return nil
+end
+
+-- 通过 UserId 查好友所在服务器
+local function getFriendServer(userId)
+    local ok, placeId, jobId = pcall(function()
+        return TeleportService:GetPlayerPlaceInstanceAsync(userId)
+    end)
+    if ok and placeId and jobId then
+        return placeId, jobId
+    end
+    return nil, nil
+end
+
+local function joinFriendByName(name)
+    if not name or name:gsub("%s", "") == "" then
+        showPopup("请输入好友用户名")
+        return false
+    end
+    local userId = getUserIdByName(name)
+    if not userId then
+        showPopup("找不到该用户，请检查用户名")
+        return false
+    end
+    local placeId, jobId = getFriendServer(userId)
+    if not placeId or not jobId then
+        showPopup("无法获取好友所在服务器（对方可能不在线或隐私受限）")
+        return false
+    end
+
+    saveStateForTeleport()
+    queueScriptOnTeleport()
+
+    local ok = pcall(function()
+        TeleportService:TeleportToPlaceInstance(placeId, jobId, LocalPlayer)
+    end)
+    if not ok then
+        showPopup("传送失败，请稍后重试")
+        return false
+    end
+    return true
+end
+
+local function startSwitchLoop()
+    if State.switchThread then
+        pcall(function() task.cancel(State.switchThread) end)
+        State.switchThread = nil
+    end
+    State.switchThread = task.spawn(function()
+        while State.AutoSwitch do
+            task.wait(180)
+            if not State.AutoSwitch then break end
+            pcall(function() saveTargetName(inputBox.Text) end)
+
+            if switchToRandomServer() then break end
+
+            saveStateForTeleport()
+            queueScriptOnTeleport()
+            local ok = pcall(function()
+                TeleportService:Teleport(game.PlaceId, LocalPlayer)
+            end)
+            if ok then break end
+        end
+    end)
+end
+
+local function stopSwitchLoop()
+    if State.switchThread then
+        pcall(function() task.cancel(State.switchThread) end)
+        State.switchThread = nil
+    end
+end
+-- ===== 换服 / 加入好友核心逻辑结束 =====
 
 local function bindCharacterAuto()
     if State.characterConn then
@@ -576,49 +842,80 @@ local function bindCharacterAuto()
 end
 bindCharacterAuto()
 
+-- ===== UI 构建 =====
 local btnMain, _ = createToggleRow("主账号开启", false, 8, mainPage)
 local btnSub, _  = createToggleRow("子账号开启", false, 46, mainPage)
+local btnSwitch, _ = createToggleRow("自动换服", false, 122, mainPage)
 
-local inputRow = Instance.new("Frame")
-inputRow.Size = UDim2.new(0, 276, 0, 32)
-inputRow.Position = UDim2.new(0, 10, 0, 84)
-inputRow.BackgroundColor3 = Theme.Row
-inputRow.BackgroundTransparency = 0.3
-inputRow.BorderSizePixel = 0
-inputRow.ZIndex = 2
-Instance.new("UICorner", inputRow).CornerRadius = UDim.new(0, 8)
-inputRow.Parent = mainPage
-
-local inputLbl = Instance.new("TextLabel")
-inputLbl.Size = UDim2.new(0, 90, 1, 0)
-inputLbl.Position = UDim2.new(0, 12, 0, 0)
-inputLbl.BackgroundTransparency = 1
-inputLbl.Text = "主账号名称"
-inputLbl.TextColor3 = Theme.Text
-inputLbl.TextSize = 11
-inputLbl.Font = Enum.Font.GothamMedium
-inputLbl.TextXAlignment = Enum.TextXAlignment.Left
-inputLbl.ZIndex = 3
-inputLbl.Parent = inputRow
-
-local inputBox = Instance.new("TextBox")
-inputBox.Size = UDim2.new(0, 160, 0, 22)
-inputBox.Position = UDim2.new(1, -170, 0.5, -11)
-inputBox.BackgroundColor3 = Theme.Control
-inputBox.BorderSizePixel = 0
-inputBox.Text = ""
-inputBox.PlaceholderText = "输入主账号名称"
-inputBox.PlaceholderColor3 = Theme.TextDim
-inputBox.TextColor3 = Theme.Text
-inputBox.TextSize = 11
-inputBox.Font = Enum.Font.GothamMedium
-inputBox.ClearTextOnFocus = false
-inputBox.ZIndex = 3
-Instance.new("UICorner", inputBox).CornerRadius = UDim.new(0, 6)
-inputBox.Parent = inputRow
-
+local inputBox = createInputRow("主账号名称", "输入主账号名称", loadTargetName() or "", 84, mainPage)
 inputBox.FocusLost:Connect(function()
     State.SubTargetName = inputBox.Text
+    saveTargetName(inputBox.Text)
+end)
+
+-- 加入好友行
+local friendRow = Instance.new("Frame")
+friendRow.Size = UDim2.new(0, 276, 0, 32)
+friendRow.Position = UDim2.new(0, 10, 0, 160)
+friendRow.BackgroundColor3 = Theme.Row
+friendRow.BackgroundTransparency = 0.3
+friendRow.BorderSizePixel = 0
+friendRow.ZIndex = 2
+Instance.new("UICorner", friendRow).CornerRadius = UDim.new(0, 8)
+friendRow.Parent = mainPage
+
+local friendLbl = Instance.new("TextLabel")
+friendLbl.Size = UDim2.new(0, 90, 1, 0)
+friendLbl.Position = UDim2.new(0, 12, 0, 0)
+friendLbl.BackgroundTransparency = 1
+friendLbl.Text = "好友用户名"
+friendLbl.TextColor3 = Theme.Text
+friendLbl.TextSize = 11
+friendLbl.Font = Enum.Font.GothamMedium
+friendLbl.TextXAlignment = Enum.TextXAlignment.Left
+friendLbl.ZIndex = 3
+friendLbl.Parent = friendRow
+
+local friendBox = Instance.new("TextBox")
+friendBox.Size = UDim2.new(0, 100, 0, 22)
+friendBox.Position = UDim2.new(0, 104, 0.5, -11)
+friendBox.BackgroundColor3 = Theme.Control
+friendBox.BorderSizePixel = 0
+friendBox.Text = loadFriendName() or ""
+friendBox.PlaceholderText = "好友名"
+friendBox.PlaceholderColor3 = Theme.TextDim
+friendBox.TextColor3 = Theme.Text
+friendBox.TextSize = 11
+friendBox.Font = Enum.Font.GothamMedium
+friendBox.ClearTextOnFocus = false
+friendBox.ZIndex = 3
+Instance.new("UICorner", friendBox).CornerRadius = UDim.new(0, 6)
+friendBox.Parent = friendRow
+
+local friendJoinBtn = Instance.new("TextButton")
+friendJoinBtn.Size = UDim2.new(0, 56, 0, 22)
+friendJoinBtn.Position = UDim2.new(1, -64, 0.5, -11)
+friendJoinBtn.BackgroundColor3 = Theme.Accent
+friendJoinBtn.Text = "加入"
+friendJoinBtn.TextColor3 = Theme.Text
+friendJoinBtn.TextSize = 11
+friendJoinBtn.Font = Enum.Font.GothamBold
+friendJoinBtn.AutoButtonColor = false
+friendJoinBtn.ZIndex = 3
+Instance.new("UICorner", friendJoinBtn).CornerRadius = UDim.new(0, 6)
+friendJoinBtn.Parent = friendRow
+friendJoinBtn.MouseEnter:Connect(function() friendJoinBtn.BackgroundColor3 = Theme.AccentHover end)
+friendJoinBtn.MouseLeave:Connect(function() friendJoinBtn.BackgroundColor3 = Theme.Accent end)
+
+friendJoinBtn.MouseButton1Click:Connect(function()
+    local name = friendBox.Text
+    if not name or name:gsub("%s", "") == "" then
+        showPopup("请输入好友用户名")
+        return
+    end
+    State.FriendName = name
+    saveFriendName(name)
+    joinFriendByName(name)
 end)
 
 local function refreshToggle(btn, on)
@@ -656,7 +953,6 @@ btnSub.MouseButton1Click:Connect(function()
         end
         State.SubTargetName = name
     end
-
     State.SubAccount = not State.SubAccount
     refreshToggle(btnSub, State.SubAccount)
     if State.SubAccount then
@@ -665,6 +961,16 @@ btnSub.MouseButton1Click:Connect(function()
         startSubFollowLoop()
     else
         stopSubFollowLoop()
+    end
+end)
+
+btnSwitch.MouseButton1Click:Connect(function()
+    State.AutoSwitch = not State.AutoSwitch
+    refreshToggle(btnSwitch, State.AutoSwitch)
+    if State.AutoSwitch then
+        startSwitchLoop()
+    else
+        stopSwitchLoop()
     end
 end)
 
