@@ -5,6 +5,7 @@ local Lighting = game:GetService("Lighting")
 local GuiService = game:GetService("GuiService")
 local UserInputService = game:GetService("UserInputService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 
 local instantInteract = false
@@ -35,6 +36,14 @@ local npcInitDone = false
 local npcInitRunning = false
 local npcInitIndex = 1
 local lastNpcInitTeleport = 0
+
+local autoSugarMode = false
+local pickedThisLife = false
+local lockedTarget, lockedPrompt = nil, nil
+local lastSugarPrompt = nil
+local HAUNTED_POS = Vector3.new(6920, 4618, -3267)
+local PLACE_POS = Vector3.new(6816, 4618, -3611)
+local sugarCandidates = {}
 
 local NPC_INIT_POINTS = {
     Vector3.new(6121, 4237, -2985),
@@ -119,14 +128,22 @@ local TELEPORT_LOCATIONS = {
     {Name = "神秘岛", Pos = Vector3.new(5920, 4620.268, -3180.081)},
 }
 
+local function clickifyPrompt(p)
+    pcall(function()
+        p.HoldDuration = 0
+        p.RequiresLineOfSight = false
+    end)
+end
+
 local function firePrompt(prompt)
     if not prompt or not prompt:IsA("ProximityPrompt") then return end
+    clickifyPrompt(prompt)
     pcall(function()
         if fireproximityprompt then
             fireproximityprompt(prompt)
         else
-            prompt:InputHoldBegin()
-            prompt:InputHoldEnd()
+            prompt:InputHoldBegin(LocalPlayer)
+            prompt:InputHoldEnd(LocalPlayer)
         end
     end)
 end
@@ -140,6 +157,17 @@ local function clickScreenCenter()
     VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 0)
     task.wait(0.01)
     VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 0)
+end
+
+local function clickScreenRight()
+    local camera = Workspace.CurrentCamera
+    if not camera then return end
+    local viewport = camera.ViewportSize
+    local rightX = viewport.X * 0.85
+    local centerY = viewport.Y / 2
+    VirtualInputManager:SendMouseButtonEvent(rightX, centerY, 0, true, game, 0)
+    task.wait(0.01)
+    VirtualInputManager:SendMouseButtonEvent(rightX, centerY, 0, false, game, 0)
 end
 
 local function EquipAllItems()
@@ -221,9 +249,7 @@ end
 local function setPromptInstant()
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if obj:IsA("ProximityPrompt") then
-            pcall(function()
-                obj.HoldDuration = 0
-            end)
+            clickifyPrompt(obj)
         end
     end
 end
@@ -297,7 +323,6 @@ local function findNearestCandy()
             end
         end
     end
-
     return best
 end
 
@@ -377,16 +402,311 @@ local function stopNpcPullLoop()
     end
 end
 
-Workspace.DescendantAdded:Connect(function(obj)
-    if instantInteract and obj:IsA("ProximityPrompt") then
-        pcall(function()
-            obj.HoldDuration = 0
-        end)
+local function registerIfBewitched(d)
+    if d:IsA("BasePart") and d.Name:lower():find("bewitchedenergy", 1, true) then
+        local prompt = d:FindFirstChildOfClass("ProximityPrompt")
+        if prompt then
+            clickifyPrompt(prompt)
+            sugarCandidates[d] = prompt
+        end
+    end
+end
+
+local function watchMeteorRoot(root)
+    for _, d in ipairs(root:GetDescendants()) do
+        registerIfBewitched(d)
+    end
+    root.DescendantAdded:Connect(registerIfBewitched)
+end
+
+local meteorRoot = Workspace:FindFirstChild("MeteorResidue")
+if meteorRoot then watchMeteorRoot(meteorRoot) end
+Workspace.ChildAdded:Connect(function(c)
+    if c.Name == "MeteorResidue" then
+        watchMeteorRoot(c)
     end
 end)
 
+local function cleanCandidates()
+    for part in pairs(sugarCandidates) do
+        if not part:IsDescendantOf(Workspace) then
+            sugarCandidates[part] = nil
+        end
+    end
+end
+
+local function fireShopEvents()
+    local ok, shop = pcall(function()
+        return ReplicatedStorage:WaitForChild("HalloweenShopEvents", 5):WaitForChild("ShopEvents")
+    end)
+    if not ok or not shop then return end
+    local lamp = shop:FindFirstChild("Lamp")
+    if lamp then pcall(function() lamp:FireServer() end) end
+    local cauldron = shop:FindFirstChild("Cauldron")
+    if cauldron then pcall(function() cauldron:FireServer() end) end
+end
+
+local function equipToolByKeywords(keywords)
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local backpack = LocalPlayer:FindFirstChildOfClass("Backpack")
+    if not hum or not backpack then return false end
+
+    local function match(name)
+        name = name:lower()
+        for _, kw in ipairs(keywords) do
+            if name:find(kw:lower(), 1, true) then return true end
+        end
+        return false
+    end
+
+    for _, tool in ipairs(backpack:GetChildren()) do
+        if tool:IsA("Tool") and match(tool.Name) then
+            pcall(function() hum:EquipTool(tool) end)
+            return tool
+        end
+    end
+    for _, tool in ipairs(char:GetChildren()) do
+        if tool:IsA("Tool") and match(tool.Name) then
+            return tool
+        end
+    end
+    return false
+end
+
+local function triggerPromptByAttachmentName(attName)
+    local cauldron = workspace:FindFirstChild("PlaceWorkTables") and workspace.PlaceWorkTables:FindFirstChild("Cauldron")
+    if not cauldron then return false end
+    local mainPart = cauldron:FindFirstChild("Main")
+    if not mainPart then return false end
+    local att = mainPart:FindFirstChild(attName)
+    if not att then return false end
+    local prompt = att:FindFirstChildOfClass("ProximityPrompt")
+    if not prompt or not prompt.Enabled then return false end
+    firePrompt(prompt)
+    return true
+end
+
+local function claimCauldron()
+    task.wait(0.8)
+    local tool = equipToolByKeywords({"cauldron"})
+    if not tool then return false end
+    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if hrp then hrp.CFrame = CFrame.new(PLACE_POS) end
+    task.wait(5)
+    clickScreenCenter()
+    task.wait(0.5)
+    pcall(function() tool:Activate() end)
+    task.wait(1.5)
+    local cauldron = workspace:FindFirstChild("PlaceWorkTables") and workspace.PlaceWorkTables:FindFirstChild("Cauldron")
+    if cauldron then
+        for _, d in ipairs(cauldron:GetDescendants()) do
+            if d.Name == "ClaimProximity" and d:IsA("ProximityPrompt") and d.Enabled then
+                firePrompt(d)
+                break
+            end
+        end
+    end
+    task.wait(1)
+    return true
+end
+
+local function postClaimActions()
+    task.wait(1)
+    for _ = 1, 5 do
+        if equipToolByKeywords({"lamp"}) then break end
+        task.wait(0.3)
+    end
+    task.wait(0.5)
+    triggerPromptByAttachmentName("Throw")
+    task.wait(0.5)
+
+    for _ = 1, 5 do
+        if equipToolByKeywords({"bewitched", "energy"}) then break end
+        task.wait(0.3)
+    end
+    task.wait(0.5)
+    triggerPromptByAttachmentName("Throw")
+    task.wait(0.5)
+    triggerPromptByAttachmentName("Get")
+end
+
+local function isCandyName(n)
+    n = n:lower()
+    return n:find("candy", 1, true) or n:find("chocolate", 1, true) or n:find("lollipop", 1, true) or n:find("sweet", 1, true) or n:find("treat", 1, true)
+end
+
+local function eatAllCandies()
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local backpack = LocalPlayer:FindFirstChildOfClass("Backpack")
+    if not hum then return end
+    
+    local candiesToEat = {}
+    
+    for _, tool in ipairs(char:GetChildren()) do
+        if tool:IsA("Tool") and isCandyName(tool.Name) then
+            table.insert(candiesToEat, tool)
+        end
+    end
+    
+    if backpack then
+        for _, tool in ipairs(backpack:GetChildren()) do
+            if tool:IsA("Tool") and isCandyName(tool.Name) then
+                table.insert(candiesToEat, tool)
+            end
+        end
+    end
+    
+    if #candiesToEat == 0 then return end
+    
+    task.spawn(function()
+        for _, candy in ipairs(candiesToEat) do
+            if candy and candy.Parent then
+                pcall(function() 
+                    candy.Parent = char 
+                end)
+                task.wait(0.4)
+                clickScreenRight()
+                task.wait(0.2)
+                pcall(function() candy:Activate() end)
+                task.wait(0.3)
+            end
+        end
+        
+        if autoSugarMode then
+            task.wait(0.2)
+            equipToolByKeywords({"haunted"})
+        end
+    end)
+end
+
+local function watchCandyTools()
+    local function checkAdded(parent)
+        if not parent then return end
+        if parent:IsA("Tool") and isCandyName(parent.Name) then
+            eatAllCandies()
+        end
+    end
+    local char = LocalPlayer.Character
+    local backpack = LocalPlayer:FindFirstChildOfClass("Backpack")
+    if char then
+        char.ChildAdded:Connect(checkAdded)
+    end
+    if backpack then
+        backpack.ChildAdded:Connect(checkAdded)
+    end
+    LocalPlayer.CharacterAdded:Connect(function(c)
+        c.ChildAdded:Connect(checkAdded)
+    end)
+end
+watchCandyTools()
+
+local function hauntedLampPhase()
+    task.wait(0.5)
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if hrp then hrp.CFrame = CFrame.new(HAUNTED_POS) end
+    task.wait(1)
+    for _ = 1, 10 do
+        if equipToolByKeywords({"haunted"}) then break end
+        task.wait(0.3)
+    end
+    task.wait(1)
+
+    task.spawn(function()
+        while autoSugarMode do
+            local c = LocalPlayer.Character
+            local h = c and c:FindFirstChild("HumanoidRootPart")
+            if h then
+                for _, d in ipairs(Workspace:GetDescendants()) do
+                    if d:IsA("ProximityPrompt") then
+                        local parent = d.Parent
+                        if parent and parent:IsA("BasePart") then
+                            if (parent.Position - h.Position).Magnitude <= 30 then
+                                firePrompt(d)
+                            end
+                        end
+                    end
+                end
+            end
+            task.wait(0.2)
+        end
+    end)
+end
+
+Workspace.DescendantAdded:Connect(function(obj)
+    if instantInteract and obj:IsA("ProximityPrompt") then
+        clickifyPrompt(obj)
+    end
+end)
+
+local function resetLife()
+    pickedThisLife = false
+    lockedTarget, lockedPrompt = nil, nil
+    lastSugarPrompt = nil
+end
+LocalPlayer.CharacterAdded:Connect(resetLife)
+if LocalPlayer.Character then resetLife() end
+
 RunService.RenderStepped:Connect(function()
     local now = tick()
+
+    if autoSugarMode then
+        if not pickedThisLife then
+            if not lockedTarget or not lockedTarget:IsDescendantOf(Workspace) then
+                cleanCandidates()
+                lockedTarget, lockedPrompt = nil, nil
+                local char = LocalPlayer.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    local bestDist = math.huge
+                    for part, prompt in pairs(sugarCandidates) do
+                        local d = (part.Position - hrp.Position).Magnitude
+                        if d < bestDist then
+                            bestDist = d
+                            lockedTarget, lockedPrompt = part, prompt
+                        end
+                    end
+                else
+                    for part, prompt in pairs(sugarCandidates) do
+                        lockedTarget, lockedPrompt = part, prompt
+                        break
+                    end
+                end
+            end
+
+            local target, prompt = lockedTarget, lockedPrompt
+            if target and prompt then
+                local char = LocalPlayer.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    hrp.CFrame = CFrame.new(target.Position + Vector3.new(0, 2, 0))
+                    if prompt ~= lastSugarPrompt then
+                        lastSugarPrompt = prompt
+                        clickifyPrompt(prompt)
+                    end
+                    
+                    pickedThisLife = true
+                    sugarCandidates[target] = nil
+                    
+                    task.spawn(function()
+                        task.wait(3)
+                        firePrompt(prompt)
+                        
+                        task.wait(1)
+                        fireShopEvents()
+                        task.wait(1)
+                        if claimCauldron() then
+                            postClaimActions()
+                            if autoSugarMode then hauntedLampPhase() end
+                        end
+                    end)
+                end
+            end
+        end
+        return
+    end
 
     local character = LocalPlayer.Character
     if not character then return end
@@ -396,7 +716,6 @@ RunService.RenderStepped:Connect(function()
     if npcInitRunning then
         if now - lastNpcInitTeleport >= 0.25 then
             lastNpcInitTeleport = now
-
             if npcInitIndex > #NPC_INIT_POINTS then
                 npcInitDone = true
                 npcInitRunning = false
@@ -407,7 +726,6 @@ RunService.RenderStepped:Connect(function()
                 end
                 return
             end
-
             local target = NPC_INIT_POINTS[npcInitIndex]
             myRoot.CFrame = CFrame.new(target + Vector3.new(0, 5, 0))
             npcInitIndex = npcInitIndex + 1
@@ -418,11 +736,9 @@ RunService.RenderStepped:Connect(function()
     if initRunning then
         if now - lastInitTeleport >= 0.25 then
             lastInitTeleport = now
-
             local allPoints = {}
             for _, p in ipairs(CHEST_POINTS) do table.insert(allPoints, p) end
             for _, p in ipairs(CANDY_POINTS) do table.insert(allPoints, p) end
-
             if initIndex > #allPoints then
                 initDone = true
                 initRunning = false
@@ -433,7 +749,6 @@ RunService.RenderStepped:Connect(function()
                 end
                 return
             end
-
             local target = allPoints[initIndex]
             myRoot.CFrame = CFrame.new(target + Vector3.new(0, 5, 0))
             initIndex = initIndex + 1
@@ -444,12 +759,10 @@ RunService.RenderStepped:Connect(function()
     if candyAutoMode then
         EquipAllItems()
         useAllCandies()
-
         if now - lastScreenClick >= 0.1 then
             lastScreenClick = now
             task.spawn(clickScreenCenter)
         end
-
         if now - lastCandyTeleport >= 0.3 then
             lastCandyTeleport = now
             local candy = findNearestCandy()
@@ -466,7 +779,6 @@ RunService.RenderStepped:Connect(function()
 
     if graveMode then
         EquipAllItems()
-
         if not currentGrave then
             currentGrave = getFirstGrave()
         end
@@ -480,7 +792,9 @@ end)
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "KsV4UI"
 screenGui.ResetOnSpawn = false
-screenGui.Parent = game:GetService("CoreGui")
+screenGui.IgnoreGuiInset = true
+screenGui.DisplayOrder = 999
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 380, 0, 280)
@@ -654,6 +968,7 @@ local function createToggle(parent, label, yPos, callback)
         btn.BackgroundColor3 = state and Color3.fromRGB(50, 180, 50) or Color3.fromRGB(60, 60, 60)
         if callback then callback(state) end
     end)
+    return row
 end
 
 local function createSubLabel(parent, text, yPos)
@@ -670,7 +985,7 @@ local function createSubLabel(parent, text, yPos)
     return lbl
 end
 
-local page1, _ = createPage(220)
+local page1, _ = createPage(260)
 
 local initBtn = Instance.new("TextButton")
 initBtn.Size = UDim2.new(0, 290, 0, 30)
@@ -698,22 +1013,36 @@ initBtn.MouseButton1Click:Connect(function()
     initBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
 end)
 
-createSubLabel(page1, "🍭 糖果", 40)
+createSubLabel(page1, "🍭 糖果(先初始化)", 40)
 
-createToggle(page1, "自动捡糖", 58, function(state)
+local rowCandyAuto = createToggle(page1, "自动捡糖", 58, function(state)
     candyAutoMode = state
+    if state then
+        rowSugarAuto.Visible = false
+    else
+        rowSugarAuto.Visible = false
+    end
 end)
 
-createSubLabel(page1, "🔑钥匙和宝箱📦", 102)
+local rowSugarAuto = createToggle(page1, "提灯刷糖(开启后等待陨石降落)", 96, function(state)
+    autoSugarMode = state
+    if state then
+        rowCandyAuto.Visible = false
+    else
+        rowCandyAuto.Visible = false
+    end
+end)
 
-createToggle(page1, "自动挖钥匙", 120, function(state)
+createSubLabel(page1, "🔑钥匙和宝箱📦", 130)
+
+createToggle(page1, "自动挖钥匙", 148, function(state)
     graveMode = state
     if not state then currentGrave = nil end
 end)
 
 local chestTeleportBtn = Instance.new("TextButton")
 chestTeleportBtn.Size = UDim2.new(0, 290, 0, 30)
-chestTeleportBtn.Position = UDim2.new(0, 5, 0, 160)
+chestTeleportBtn.Position = UDim2.new(0, 5, 0, 188)
 chestTeleportBtn.BackgroundColor3 = Color3.fromRGB(60, 130, 255)
 chestTeleportBtn.Text = "传送到宝箱 1 / 14"
 chestTeleportBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1123,10 +1452,8 @@ runScriptBtn.MouseButton1Click:Connect(function()
         scriptStatus.TextColor3 = Color3.fromRGB(255, 100, 100)
         return
     end
-
     local interval = tonumber(intervalBox.Text) or 0.1
     interval = math.clamp(interval, 0.01, 60)
-
     remoteScriptRunning = true
     scriptStatus.Text = string.format("✅ 运行中 (间隔 %.2fs)", interval)
     scriptStatus.TextColor3 = Color3.fromRGB(100, 255, 100)
@@ -1139,7 +1466,6 @@ runScriptBtn.MouseButton1Click:Connect(function()
             remoteScriptRunning = false
             return
         end
-
         while remoteScriptRunning do
             local success, execErr = pcall(fn)
             if not success then
