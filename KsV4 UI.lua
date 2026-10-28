@@ -683,7 +683,8 @@ end
 local function watchCandyTools()
     local function checkAdded(parent)
         if not parent then return end
-        if parent:IsA("Tool") and isCandyName(parent.Name) then
+        -- 【关键修改】：只有开启了提灯刷糖模式，才自动吃并点击屏幕
+        if autoSugarMode and parent:IsA("Tool") and isCandyName(parent.Name) then
             eatAllCandies()
         end
     end
@@ -838,7 +839,8 @@ RunService.RenderStepped:Connect(function()
                 npcInitDone = true
                 npcInitRunning = false
                 npcInitIndex = 1
-                if npcInitBtn then                    npcInitBtn.Text = "✅ NPC已加载"
+                if npcInitBtn then
+                    npcInitBtn.Text = "✅ NPC已加载"
                     npcInitBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
                 end
                 return
