@@ -45,6 +45,50 @@ local HAUNTED_POS = Vector3.new(6920, 4618, -3267)
 local PLACE_POS = Vector3.new(6816, 4618, -3611)
 local sugarCandidates = {}
 
+local autoLBMode = false
+local lbInitDone = false
+local lbInitRunning = false
+local lbInitIndex = 1
+local lastLbInitTeleport = 0
+local lbCandidates = {}
+
+local LB_INIT_POINTS = {
+    Vector3.new(9805, 4616, -4567),
+    Vector3.new(9905, 4618, -4733),
+    Vector3.new(9930, 4618, -4616),
+    Vector3.new(8857, 4626, -5611),
+    Vector3.new(8906, 4627, -5432),
+    Vector3.new(10623, 3823, -6037),
+    Vector3.new(10662, 3823, -6046),
+    Vector3.new(10666, 3823, -6000),
+    Vector3.new(10763, 3823, -6232),
+    Vector3.new(10283, 4137, -6389),
+    Vector3.new(10096, 4618, -4758),
+    Vector3.new(9988, 4618, -4834),
+    Vector3.new(9631, 4629, -5499),
+    Vector3.new(9541, 4622, -4976),
+    Vector3.new(9187, 4625, -3874),
+    Vector3.new(8942, 4621, -3948),
+    Vector3.new(9181, 4619, -3912),
+    Vector3.new(8828, 4625, -3826),
+    Vector3.new(9292, 4627, -3640),
+    Vector3.new(8552, 4622, -3589),
+    Vector3.new(8222, 4625, -4629),
+    Vector3.new(9030, 4621, -6096),
+    Vector3.new(9352, 4615, -6515),
+    Vector3.new(9670, 4633, -6625),
+    Vector3.new(9936, 4618, -6316),
+    Vector3.new(10048, 4557, -6481),
+    Vector3.new(10698, 4632, -6385),
+    Vector3.new(10651, 4633, -5523),
+    Vector3.new(12186, 4634, -4648),
+    Vector3.new(6023, 4234, -3012),
+    Vector3.new(10469, 4616, -4359),
+    Vector3.new(9478, 4628, -3604),
+    Vector3.new(9700, 4636, -3881),
+    Vector3.new(10048, 4139, -6558)
+}
+
 local NPC_INIT_POINTS = {
     Vector3.new(6121, 4237, -2985),
     Vector3.new(7293, 5660, -1939),
@@ -326,6 +370,27 @@ local function findNearestCandy()
     return best
 end
 
+local function findNearestLB()
+    local character = LocalPlayer.Character
+    if not character then return nil end
+    local myRoot = character:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return nil end
+
+    local best = nil
+    local bestDist = math.huge
+
+    for part, prompt in pairs(lbCandidates) do
+        if part and part.Parent then
+            local dist = (part.Position - myRoot.Position).Magnitude
+            if dist < bestDist then
+                bestDist = dist
+                best = {Prompt = prompt, Part = part, Position = part.Position}
+            end
+        end
+    end
+    return best
+end
+
 local function pullNearbyNpcs()
     local character = LocalPlayer.Character
     if not character then return end
@@ -427,10 +492,44 @@ Workspace.ChildAdded:Connect(function(c)
     end
 end)
 
+local function registerLB(d)
+    if d:IsA("BasePart") and (d.Name:lower():find("lbbottle", 1, true) or d.Name:lower():find("lbchest", 1, true)) then
+        local prompt = d:FindFirstChildOfClass("ProximityPrompt")
+        if not prompt and d:FindFirstChild("hitbox") then
+            prompt = d.hitbox:FindFirstChild("Proximity")
+        end
+        if prompt then
+            clickifyPrompt(prompt)
+            lbCandidates[d] = prompt
+        end
+    end
+end
+
+local function watchLBRoot(root)
+    for _, d in ipairs(root:GetDescendants()) do
+        registerLB(d)
+    end
+    root.DescendantAdded:Connect(registerLB)
+end
+
+local lbRoot = Workspace:FindFirstChild("OthersSpecialEvents") and Workspace.OthersSpecialEvents:FindFirstChild("LBSearch")
+if lbRoot then watchLBRoot(lbRoot) end
+Workspace.ChildAdded:Connect(function(c)
+    if c.Name == "OthersSpecialEvents" then
+        local lb = c:FindFirstChild("LBSearch")
+        if lb then watchLBRoot(lb) end
+    end
+end)
+
 local function cleanCandidates()
     for part in pairs(sugarCandidates) do
         if not part:IsDescendantOf(Workspace) then
             sugarCandidates[part] = nil
+        end
+    end
+    for part in pairs(lbCandidates) do
+        if not part:IsDescendantOf(Workspace) then
+            lbCandidates[part] = nil
         end
     end
 end
@@ -708,6 +807,25 @@ RunService.RenderStepped:Connect(function()
         return
     end
 
+    if autoLBMode then
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local lb = findNearestLB()
+            if lb then
+                if now - lastTeleport >= 0.3 then
+                    lastTeleport = now
+                    hrp.CFrame = CFrame.new(lb.Position + Vector3.new(0, 3, 0))
+                    if now - lastPrompt >= 0.1 then
+                        lastPrompt = now
+                        firePrompt(lb.Prompt)
+                    end
+                    return
+                end
+            end
+        end
+    end
+
     local character = LocalPlayer.Character
     if not character then return end
     local myRoot = character:FindFirstChild("HumanoidRootPart")
@@ -720,8 +838,7 @@ RunService.RenderStepped:Connect(function()
                 npcInitDone = true
                 npcInitRunning = false
                 npcInitIndex = 1
-                if npcInitBtn then
-                    npcInitBtn.Text = "✅ NPC已加载"
+                if npcInitBtn then                    npcInitBtn.Text = "✅ NPC已加载"
                     npcInitBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
                 end
                 return
@@ -729,6 +846,26 @@ RunService.RenderStepped:Connect(function()
             local target = NPC_INIT_POINTS[npcInitIndex]
             myRoot.CFrame = CFrame.new(target + Vector3.new(0, 5, 0))
             npcInitIndex = npcInitIndex + 1
+        end
+        return
+    end
+
+    if lbInitRunning then
+        if now - lastLbInitTeleport >= 0.25 then
+            lastLbInitTeleport = now
+            if lbInitIndex > #LB_INIT_POINTS then
+                lbInitDone = true
+                lbInitRunning = false
+                lbInitIndex = 1
+                if lbInitBtn then
+                    lbInitBtn.Text = "✅ LB已初始化"
+                    lbInitBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+                end
+                return
+            end
+            local target = LB_INIT_POINTS[lbInitIndex]
+            myRoot.CFrame = CFrame.new(target + Vector3.new(0, 5, 0))
+            lbInitIndex = lbInitIndex + 1
         end
         return
     end
@@ -1013,7 +1150,7 @@ initBtn.MouseButton1Click:Connect(function()
     initBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
 end)
 
-createSubLabel(page1, "🍭 糖果(先初始化)", 40)
+createSubLabel(page1, "🍭 糖果(先初始化)(底下两个选项只能开一个)", 40)
 
 local rowCandyAuto = createToggle(page1, "自动捡糖", 58, function(state)
     candyAutoMode = state
@@ -1070,7 +1207,7 @@ chestTeleportBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-local page2, _ = createPage(400)
+local page2, _ = createPage(450)
 
 createToggle(page2, "全亮 + 除雾", 8, function(state)
     if state then enableFullBright() else disableFullBright() end
@@ -1088,11 +1225,43 @@ createToggle(page2, "移除加载弹窗", 92, function(state)
     end
 end)
 
-createSubLabel(page2, "🏃 移动设置", 136)
+createSubLabel(page2, "LB相关", 130)
+
+local lbInitBtn = Instance.new("TextButton")
+lbInitBtn.Size = UDim2.new(0, 290, 0, 30)
+lbInitBtn.Position = UDim2.new(0, 5, 0, 148)
+lbInitBtn.BackgroundColor3 = Color3.fromRGB(255, 170, 40)
+lbInitBtn.Text = "🔄 初始化LB药水"
+lbInitBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+lbInitBtn.TextSize = 11
+lbInitBtn.Font = Enum.Font.GothamBold
+lbInitBtn.AutoButtonColor = false
+local lbInitBtnCorner = Instance.new("UICorner")
+lbInitBtnCorner.CornerRadius = UDim.new(0, 6)
+lbInitBtnCorner.Parent = lbInitBtn
+lbInitBtn.Parent = page2
+
+lbInitBtn.MouseButton1Click:Connect(function()
+    if lbInitDone then
+        lbInitBtn.Text = "✅LB药水已初始化"
+        return
+    end
+    lbInitRunning = true
+    lbInitIndex = 1
+    lastLbInitTeleport = 0
+    lbInitBtn.Text = "⏳ LB药水初始化中..."
+    lbInitBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+end)
+
+createToggle(page2, "自动捡LB药水", 186, function(state)
+    autoLBMode = state
+end)
+
+createSubLabel(page2, "🏃 移动设置", 230)
 
 local speedLabel = Instance.new("TextLabel")
 speedLabel.Size = UDim2.new(0, 90, 0, 24)
-speedLabel.Position = UDim2.new(0, 5, 0, 154)
+speedLabel.Position = UDim2.new(0, 5, 0, 248)
 speedLabel.BackgroundTransparency = 1
 speedLabel.Text = "移速:"
 speedLabel.TextColor3 = Color3.fromRGB(200, 200, 205)
@@ -1103,7 +1272,7 @@ speedLabel.Parent = page2
 
 local speedBox = Instance.new("TextBox")
 speedBox.Size = UDim2.new(0, 80, 0, 24)
-speedBox.Position = UDim2.new(0, 60, 0, 154)
+speedBox.Position = UDim2.new(0, 60, 0, 248)
 speedBox.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 speedBox.BorderSizePixel = 0
 speedBox.Text = "16"
@@ -1118,7 +1287,7 @@ speedBox.Parent = page2
 
 local applySpeedBtn = Instance.new("TextButton")
 applySpeedBtn.Size = UDim2.new(0, 60, 0, 24)
-applySpeedBtn.Position = UDim2.new(0, 150, 0, 154)
+applySpeedBtn.Position = UDim2.new(0, 150, 0, 248)
 applySpeedBtn.BackgroundColor3 = Color3.fromRGB(60, 130, 255)
 applySpeedBtn.Text = "应用"
 applySpeedBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1141,7 +1310,7 @@ end)
 
 local jumpLabel = Instance.new("TextLabel")
 jumpLabel.Size = UDim2.new(0, 90, 0, 24)
-jumpLabel.Position = UDim2.new(0, 5, 0, 186)
+jumpLabel.Position = UDim2.new(0, 5, 0, 280)
 jumpLabel.BackgroundTransparency = 1
 jumpLabel.Text = "跳跃力:"
 jumpLabel.TextColor3 = Color3.fromRGB(200, 200, 205)
@@ -1152,7 +1321,7 @@ jumpLabel.Parent = page2
 
 local jumpBox = Instance.new("TextBox")
 jumpBox.Size = UDim2.new(0, 80, 0, 24)
-jumpBox.Position = UDim2.new(0, 60, 0, 186)
+jumpBox.Position = UDim2.new(0, 60, 0, 280)
 jumpBox.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 jumpBox.BorderSizePixel = 0
 jumpBox.Text = "50"
@@ -1167,7 +1336,7 @@ jumpBox.Parent = page2
 
 local applyJumpBtn = Instance.new("TextButton")
 applyJumpBtn.Size = UDim2.new(0, 60, 0, 24)
-applyJumpBtn.Position = UDim2.new(0, 150, 0, 186)
+applyJumpBtn.Position = UDim2.new(0, 150, 0, 280)
 applyJumpBtn.BackgroundColor3 = Color3.fromRGB(60, 130, 255)
 applyJumpBtn.Text = "应用"
 applyJumpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1188,11 +1357,11 @@ applyJumpBtn.MouseButton1Click:Connect(function()
     humanoid.JumpPower = jump
 end)
 
-createSubLabel(page2, "👊 NPC 抓取", 222)
+createSubLabel(page2, "👊 NPC 抓取", 316)
 
 local npcInitBtn = Instance.new("TextButton")
 npcInitBtn.Size = UDim2.new(0, 290, 0, 28)
-npcInitBtn.Position = UDim2.new(0, 5, 0, 240)
+npcInitBtn.Position = UDim2.new(0, 5, 0, 334)
 npcInitBtn.BackgroundColor3 = Color3.fromRGB(255, 170, 40)
 npcInitBtn.Text = "🔄 初始化NPC"
 npcInitBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1216,7 +1385,7 @@ npcInitBtn.MouseButton1Click:Connect(function()
     npcInitBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
 end)
 
-createToggle(page2, "抓取附近NPC", 276, function(state)
+createToggle(page2, "抓取附近NPC", 370, function(state)
     npcPullEnabled = state
     if state then
         startNpcPullLoop()
@@ -1227,7 +1396,7 @@ end)
 
 local pullRadiusLabel = Instance.new("TextLabel")
 pullRadiusLabel.Size = UDim2.new(0, 90, 0, 24)
-pullRadiusLabel.Position = UDim2.new(0, 5, 0, 312)
+pullRadiusLabel.Position = UDim2.new(0, 5, 0, 406)
 pullRadiusLabel.BackgroundTransparency = 1
 pullRadiusLabel.Text = "抓取半径:"
 pullRadiusLabel.TextColor3 = Color3.fromRGB(200, 200, 205)
@@ -1238,7 +1407,7 @@ pullRadiusLabel.Parent = page2
 
 local pullRadiusBox = Instance.new("TextBox")
 pullRadiusBox.Size = UDim2.new(0, 70, 0, 24)
-pullRadiusBox.Position = UDim2.new(0, 80, 0, 312)
+pullRadiusBox.Position = UDim2.new(0, 80, 0, 406)
 pullRadiusBox.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 pullRadiusBox.BorderSizePixel = 0
 pullRadiusBox.Text = "∞"
@@ -1253,7 +1422,7 @@ pullRadiusBox.Parent = page2
 
 local frontLabel = Instance.new("TextLabel")
 frontLabel.Size = UDim2.new(0, 70, 0, 24)
-frontLabel.Position = UDim2.new(0, 155, 0, 312)
+frontLabel.Position = UDim2.new(0, 155, 0, 406)
 frontLabel.BackgroundTransparency = 1
 frontLabel.Text = "前方:"
 frontLabel.TextColor3 = Color3.fromRGB(200, 200, 205)
@@ -1264,7 +1433,7 @@ frontLabel.Parent = page2
 
 local frontBox = Instance.new("TextBox")
 frontBox.Size = UDim2.new(0, 50, 0, 24)
-frontBox.Position = UDim2.new(0, 200, 0, 312)
+frontBox.Position = UDim2.new(0, 200, 0, 406)
 frontBox.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 frontBox.BorderSizePixel = 0
 frontBox.Text = "5"
@@ -1279,7 +1448,7 @@ frontBox.Parent = page2
 
 local intervalLabel2 = Instance.new("TextLabel")
 intervalLabel2.Size = UDim2.new(0, 90, 0, 24)
-intervalLabel2.Position = UDim2.new(0, 5, 0, 342)
+intervalLabel2.Position = UDim2.new(0, 5, 0, 436)
 intervalLabel2.BackgroundTransparency = 1
 intervalLabel2.Text = "抓取间隔:"
 intervalLabel2.TextColor3 = Color3.fromRGB(200, 200, 205)
@@ -1290,7 +1459,7 @@ intervalLabel2.Parent = page2
 
 local intervalBox2 = Instance.new("TextBox")
 intervalBox2.Size = UDim2.new(0, 70, 0, 24)
-intervalBox2.Position = UDim2.new(0, 80, 0, 342)
+intervalBox2.Position = UDim2.new(0, 80, 0, 436)
 intervalBox2.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 intervalBox2.BorderSizePixel = 0
 intervalBox2.Text = "0.1"
@@ -1305,7 +1474,7 @@ intervalBox2.Parent = page2
 
 local applyPullBtn = Instance.new("TextButton")
 applyPullBtn.Size = UDim2.new(0, 60, 0, 24)
-applyPullBtn.Position = UDim2.new(0, 235, 0, 342)
+applyPullBtn.Position = UDim2.new(0, 235, 0, 436)
 applyPullBtn.BackgroundColor3 = Color3.fromRGB(60, 130, 255)
 applyPullBtn.Text = "应用"
 applyPullBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
